@@ -17,6 +17,7 @@ pio run
 sh checks/run.sh
 python3 checks/minute.py
 python3 checks/rotation.py
+python3 checks/ui.py
 sh checks/run.sh /tmp/tokenmeter-live.json
 ```
 
@@ -30,7 +31,7 @@ sh checks/run.sh /tmp/tokenmeter-live.json
 - `src/ble.{h,cpp}`：Tokenmeter 专用 UUID，RX WRITE、ACK READ/NOTIFY。最大 180-byte write、65536-byte 帧、256 pairs、192-byte 身份。超长丢弃至 LF，断连清空未完输入；接收回调只交接字节。主线程完整校验、原子换快照后才 ACK `ok`；失败 ACK `error`，保留原快照/时间。generation 防止跨连接提交；仅一个未完成帧/连接。芯片地址派生稳定 static-random 身份，在 RAM 中设置并回读自检，避免复用旧 HID 的 factory/public 身份；不新增 NVS/eFuse 配置写入。无加密，无配对流程。
 - `src/board.{h,cpp}`：保留参考板 display→PMU→touch 顺序、共享 reset GPIO2、触摸使用实机测得与面板对齐的CST原生坐标（swapXY=false/mirrorXY=(false,false)）；沿用参考板的交换/镜像会额外偏转90°，造成旋转后按钮和手势同时错位、200亮度、8秒硬件关机及偶数flush。QMI8658以低功耗21Hz模式提供加速度，主循环约100ms采样；稳定400ms后切换LVGL四向。平放、45°附近、明显移动/不合理重力大小及触摸时保持原方向。IMU失败只在串口报告并保留固定方向，不中断账单。使用现有LVGL的 `lv_display_rotate_area` / `lv_draw_sw_rotate` 和38400-byte PSRAM条带，保护容量边界；LVGL统一逆变换触摸。GPIO18上拉，30ms消抖，只在按下沿发一次回首页事件，不占BOOT/PWR/RESET。
 - `src/main.cpp`：先检查 PSRAM，再分配 current/staging 和 draw 双缓冲，检查大块内存及初始化失败。BLE RX 双缓冲、JSON 文档也指定 PSRAM；不让大型快照临时对象进入 loop 栈。NimBLE 保留内部 RAM，关闭 central/observer，单连接。运行时打印初始化后的内部/PSRAM可用内存。手势在LVGL处理指针坐标后读取，避免重复旋转；手势切页后屏蔽该笔后续原生点击直到松手，不阻塞主循环。实体HOME会清理手势并屏蔽到松手，方向改变也会取消未完手势。
-- `src/ui.{h,cpp}`：首页左对齐、珊瑚费用、蓝色输入/cache、金色输出、白色 tokens；详情 provider/ 与 model 分两行，每页两条，全部记录可达。HOME 返回首页；第一页 PREV/末页 NEXT 禁用。首页左滑进入明细，明细右滑回首页；明细上下滑仅翻明细页，第一页下滑保持。从普通/禁用按钮区域起手也可滑动；主轴达到50px且满足方向条件即触发，不等松手，每笔触摸只导航一次。屏内按钮维持原尺寸；点击必须从同一按钮起按且未形成拖动，快速松手也复核最终坐标，滑入HOME等按钮不会误点。文字、字体及隐藏状态只在变化时设置，避免重复整页重绘。金额量宽 96→48→32；详情金额也量宽；tokens 量宽 48→32，避免叠到单位。非 ASCII 身份显示 `?`，过长身份显示中间 `...`，不改状态原值。
+- `src/ui.{h,cpp}`：首页左对齐、珊瑚费用、蓝色输入/cache、金色输出、白色 tokens；详情 provider/ 与 model 分两行，每页两条，全部记录可达。HOME 返回首页；第一页 PREV/末页 NEXT 禁用。今日首页右滑到唯一昨日汇总，昨日左滑及原按钮位置的HOME >回今日，昨日无更早日期/模型明细；今日首页左滑进入模型明细，明细右滑回今日；明细上下滑仅翻明细页，第一页下滑保持。从普通/禁用按钮区域起手也可滑动；主轴达到50px且满足方向条件即触发，不等松手，每笔触摸只导航一次。屏内按钮维持原尺寸；点击必须从同一按钮起按且未形成拖动，快速松手也复核最终坐标，滑入HOME等按钮不会误点。实际用户切页用LVGL原生120ms内容淡入，快速切页先删旧动画并复位opacity；普通数据刷新和无效边界不启动动画。文字、字体及隐藏状态只在变化时设置，避免无变化重绘。金额量宽 96→48→32；详情金额也量宽；tokens 量宽 48→32，避免叠到单位。非 ASCII 身份显示 `?`，过长身份显示中间 `...`，不改状态原值。
 - `checks/`：一个 assert 自检入口，含 64KiB 接收边界/恢复、解析/身份/金额/溢出/空日边界及分页/时间/格式化检查，也接受实际daemon JSON；另含四向判向、400ms稳定、平放/斜角/震动/触摸保持、64位时间、GPIO18消抖与不连发、手势分类和第一页边界、按住越阈即触发/每笔一次、按钮区域起滑、快速松手取消点击、正常轻点、斜向拖动不恢复点击及取消后重新起按。
 - `fonts/`、`src/fonts/`：原始 TTF、许可、生成脚本及六个生成字体，详见 `fonts/README.md`。
 
@@ -39,6 +40,10 @@ sh checks/run.sh /tmp/tokenmeter-live.json
 常规UI定时刷新每60秒，年龄标签按整数分钟显示；新数据、连接变化、STALE或跨日状态变化仍立即刷新，不降低LVGL/触摸/IMU节奏。`checks/minute.py`编译实际调度代码与年龄格式分支，以模拟单调时钟覆盖60秒周期、事件提前刷新、120秒失效、午夜边界及millis回绕，无需等待真实分钟。
 
 `checks/rotation.py`组合板级实际配置、SensorLib实际坐标更新、LVGL实际面积旋转/指针逆变换/get_point及核心手势，覆盖四向边界、按钮中心和实机90°/180°点击样本。旧swap/mirror配置可复现断言失败，原生坐标配置通过；这比只验证LVGL自身正逆变换多覆盖了板级基准。临时USB坐标日志已移除。
+
+`checks/ui.py`用系统C/C++工具在临时目录编译真实LVGL/界面/字库，验证昨日与今日共享布局、按钮/手势、缺摘要及动画中断等；不操作USB/BLE。可选 `--render-dir`用于导出明确标注的离线示例图。
+
+快照固定包含今日完整分组与可选昨日摘要（`DaySummary`共享字段），昨日不占用额外模型数组；缺字段清空昨日状态，有字段则校验为根日期上一日及各数值/状态边界。今日unavailable不提前跳过昨日校验，也不阻止查看合法昨日；昨日不按自身已经结束的日期判STALE。升级后必须停止并重新启动已运行的daemon以加载新协议字段；仅更新文件/刷板而保留旧Python进程会继续收到不含摘要的旧快照，昨日显示NO DATA。
 
 新鲜度用 `esp_timer_get_time()` 的 64 位单调微秒计算，不使用会在 49 天回绕的 millis 差计算快照年龄。120 秒没有有效帧即 STALE；当 `elapsed >= day_end - epoch`，标 OLD DAY · STALE 并保留源日期，不伪称 TODAY。断连不清空现有快照、不重置新鲜度。
 

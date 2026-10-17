@@ -1,15 +1,17 @@
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 import os
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import time
 import unittest
 from unittest.mock import patch
 
-from daemon.usage import UsageScanner, day_window, encode_snapshot, MAX_COUNT, MAX_MODELS
-from daemon.tokenmeter import RX_UUID, write_snapshot
+from daemon.usage import UsageScanner, day_window, encode_snapshot, MAX_COUNT, MAX_MODELS, MAX_COST, MAX_FRAME_BYTES
+from daemon.tokenmeter import RX_UUID, collect, write_snapshot
 
 NOW = datetime(2026, 10, 16, 12, tzinfo=timezone.utc).timestamp()
 
@@ -116,11 +118,18 @@ class UsageTests(unittest.TestCase):
         self.assertEqual(snapshot['models'][0]['unpriced'], 1)
 
     def test_missing_source_is_not_empty_day(self):
-        self.assertEqual(self.scanner.snapshot(NOW)['totals']['cost'], 0)
+        empty = self.scanner.snapshot(NOW)
+        self.assertEqual(empty['totals']['cost'], 0)
+        self.assertEqual(empty['yesterday'], dict(date='2026-10-15', status='ok', issues=0, totals=empty['totals']))
         missing = UsageScanner([self.root / 'missing']).snapshot(NOW)
         self.assertEqual(missing['status'], 'unavailable')
         self.assertIsNone(missing['totals']['cost'])
-        self.assertEqual(UsageScanner([self.root, self.root / 'missing']).snapshot(NOW)['status'], 'partial')
+        self.assertEqual(missing['yesterday'], dict(date='2026-10-15', status='unavailable',
+                                                  issues=missing['issues'], totals=missing['totals']))
+        partial = UsageScanner([self.root, self.root / 'missing']).snapshot(NOW)
+        self.assertEqual(partial['status'], 'partial')
+        self.assertEqual(partial['yesterday']['status'], 'partial')
+        self.assertEqual(partial['yesterday']['issues'], partial['issues'])
 
     def test_missing_splits_fallback_and_malformed_complete_vs_unfinished_line(self):
         a = event(); a['message']['usage'] = dict(totalTokens=99, cost=dict(total=.5))
@@ -130,7 +139,11 @@ class UsageTests(unittest.TestCase):
         self.assertEqual(snapshot['totals']['tokens'], 99)
         self.assertEqual(snapshot['issues'], 1)  # missing splits, not the unfinished tail
         with path.open('a') as f: f.write('bad}\n')
-        self.assertEqual(self.scanner.snapshot(NOW)['issues'], 2)
+        malformed = self.scanner.snapshot(NOW)
+        self.assertEqual(malformed['issues'], 2)
+        self.assertEqual(malformed['yesterday']['issues'], 2)
+        self.assertEqual(malformed['yesterday']['status'], 'partial')
+        self.assertIsNone(malformed['yesterday']['totals']['cost'])
 
     def test_cache_future_records_and_day_change(self):
         self.save('a.jsonl', event('today'), event('future', timestamp=NOW + 30),
@@ -164,6 +177,189 @@ class UsageTests(unittest.TestCase):
         _, start, end, _ = day_window(NOW)
         self.save('a.jsonl', event('start', timestamp=start), event('before', timestamp=start - .001), event('end', timestamp=end))
         self.assertEqual(self.scanner.snapshot(NOW)['totals']['records'], 1)
+
+    def test_two_days_boundaries_dedup_and_midnight_rollover(self):
+        today = datetime(2026, 10, 16, tzinfo=timezone.utc).timestamp()
+        records = [event('old', timestamp=today - 86400 - .001),
+                   event('yesterday', timestamp=today - 86400, model='yesterday-model'),
+                   event('today', timestamp=today, model='today-model'),
+                   event('future', timestamp=today + 86400, model='future-model')]
+        self.save('source.jsonl', *records)
+        self.save('copy.jsonl', *records)
+        with patch.object(self.scanner, '_read', wraps=self.scanner._read) as read:
+            s = self.scanner.snapshot(NOW)
+            self.scanner.snapshot(NOW)
+            self.assertEqual(read.call_count, 2)
+            self.assertTrue(all(len(cached.records) == 2 for cached in self.scanner.cache.values()))
+            self.assertEqual(s['totals']['tokens'], 16)
+            self.assertEqual(s['totals']['cost'], .25)
+            self.assertEqual(s['totals']['records'], 1)
+            self.assertEqual([row['model'] for row in s['models']], ['today-model'])
+            self.assertEqual(s['yesterday']['totals'], s['totals'])
+            self.assertEqual(set(s['yesterday']), {'date', 'status', 'issues', 'totals'})
+            rolled = self.scanner.snapshot(today + 86400)
+            self.assertEqual(read.call_count, 4)
+            self.assertEqual(rolled['date'], '2026-10-17')
+            self.assertEqual(rolled['totals']['records'], 1)
+            self.assertEqual(rolled['yesterday']['date'], '2026-10-16')
+            self.assertEqual(rolled['yesterday']['totals'], s['totals'])
+            self.assertEqual([row['model'] for row in rolled['models']], ['future-model'])
+
+    def test_yesterday_only_needs_no_model_or_identity_payload(self):
+        provider = 'private-provider-' + 'p' * 200
+        self.save('session.jsonl', *(event(str(i), timestamp=NOW - 86400, provider=provider, model=str(i) + 'm' * 200)
+                                     for i in range(MAX_MODELS + 1)))
+        s = self.scanner.snapshot(NOW)
+        self.assertEqual(s['status'], 'ok')
+        self.assertEqual(s['models'], [])
+        self.assertTrue(all(value == 0 for value in s['totals'].values()))
+        self.assertEqual(s['yesterday']['totals']['records'], MAX_MODELS + 1)
+        self.assertEqual(s['yesterday']['totals']['cost'], (MAX_MODELS + 1) * .25)
+        payload = encode_snapshot(s)
+        self.assertNotIn(provider.encode(), payload)
+        self.assertLess(len(payload), 1000)
+
+    def test_yesterday_missing_price_and_partial(self):
+        unpriced = event('unpriced', timestamp=NOW - 86400)
+        unpriced['message']['usage'].pop('cost')
+        self.save('session.jsonl', unpriced)
+        s = self.scanner.snapshot(NOW)
+        self.assertEqual(s['totals']['cost'], 0)
+        self.assertEqual(s['yesterday']['status'], 'ok')
+        self.assertIsNone(s['yesterday']['totals']['cost'])
+        self.assertEqual(s['yesterday']['totals']['unpriced'], 1)
+        path = self.save('session.jsonl', unpriced, event('priced', timestamp=NOW - 86400 - 10))
+        with path.open('a') as stream: stream.write('{bad}\n')
+        partial = self.scanner.snapshot(NOW)
+        self.assertEqual(partial['status'], 'partial')
+        self.assertEqual(partial['yesterday']['status'], 'partial')
+        self.assertEqual(partial['yesterday']['issues'], 1)
+        self.assertEqual(partial['yesterday']['totals']['cost'], .25)
+        self.assertEqual(partial['yesterday']['totals']['unpriced'], 1)
+
+    def test_yesterday_cache_rewrite_and_delete(self):
+        a = event(timestamp=NOW - 86400)
+        path = self.save('session.jsonl', a)
+        self.assertEqual(self.scanner.snapshot(NOW)['yesterday']['totals']['cost'], .25)
+        old = path.stat()
+        a['message']['usage']['cost']['total'] = .75
+        self.save('session.jsonl', a)
+        os.utime(path, ns=(old.st_atime_ns, old.st_mtime_ns))
+        self.assertEqual(path.stat().st_size, old.st_size)
+        self.assertEqual(self.scanner.snapshot(NOW)['yesterday']['totals']['cost'], .75)
+        path.unlink()
+        s = self.scanner.snapshot(NOW)
+        self.assertEqual(s['yesterday']['totals']['tokens'], 0)
+        self.assertEqual(s['yesterday']['totals']['cost'], 0)
+        self.assertEqual(s['yesterday']['status'], 'ok')
+        self.assertFalse(self.scanner.cache)
+
+    def test_yesterday_local_dst_days(self):
+        os.environ['TZ'] = 'America/New_York'; time.tzset()
+        for date, hours in [((2026, 3, 9), 23), ((2026, 11, 2), 25)]:
+            with self.subTest(hours=hours):
+                now = datetime(*date, 12).timestamp()
+                _, start, _, _ = day_window(now)
+                previous_date = datetime.fromtimestamp(now).date() - timedelta(days=1)
+                previous_start = datetime.combine(previous_date, datetime.min.time()).timestamp()
+                self.save('session.jsonl', event('before', timestamp=previous_start - .001),
+                          event('first', timestamp=previous_start), event('last', timestamp=start - .001),
+                          event('today', timestamp=start))
+                s = self.scanner.snapshot(now)
+                self.assertEqual(s['yesterday']['date'], previous_date.isoformat())
+                self.assertEqual(s['yesterday']['totals']['tokens'], 32)
+                self.assertEqual(s['yesterday']['totals']['cost'], .5)
+                self.assertEqual(s['yesterday']['totals']['records'], 2)
+                self.assertEqual(s['totals']['records'], 1)
+                assert self.scanner.window is not None
+                self.assertEqual(start - self.scanner.window[0], hours * 3600)
+
+    def test_yesterday_date_when_timezone_skips_a_day(self):
+        os.environ['TZ'] = 'Pacific/Apia'; time.tzset()
+        now = datetime(2011, 12, 31, 12).timestamp()
+        self.save('session.jsonl', event('old', timestamp=datetime(2011, 12, 29, 12).timestamp()),
+                  event('today', timestamp=now - 1))
+        s = self.scanner.snapshot(now)
+        self.assertEqual(s['date'], '2011-12-31')
+        self.assertEqual(s['totals']['records'], 1)
+        self.assertEqual(s['yesterday']['date'], '2011-12-30')
+        self.assertEqual(s['yesterday']['status'], 'ok')
+        self.assertEqual(s['yesterday']['totals']['records'], 0)
+        self.assertEqual(s['yesterday']['totals']['cost'], 0)
+
+    def test_yesterday_overflow_does_not_discard_today(self):
+        for field, value in [('input', MAX_COUNT), ('cost', float(MAX_COST))]:
+            with self.subTest(field=field):
+                a, b = event('y1', timestamp=NOW - 86400), event('y2', timestamp=NOW - 86400 - 1)
+                for record in (a, b):
+                    if field == 'cost':
+                        record['message']['usage']['cost']['total'] = value
+                    else:
+                        record['message']['usage'].update(input=value, output=0, cacheRead=0, cacheWrite=0)
+                self.save('session.jsonl', event('today'), a, b)
+                s = self.scanner.snapshot(NOW)
+                self.assertEqual(s['status'], 'ok')
+                self.assertEqual(s['totals']['cost'], .25)
+                self.assertEqual(s['totals']['records'], 1)
+                self.assertEqual(s['yesterday']['status'], 'unavailable')
+                self.assertGreaterEqual(s['yesterday']['issues'], 1)
+                self.assertIsNone(s['yesterday']['totals']['cost'])
+                self.assertTrue(all(v == 0 for k, v in s['yesterday']['totals'].items() if k != 'cost'))
+                encode_snapshot(s)
+
+    def test_today_fallback_preserves_yesterday_and_original_date(self):
+        cases = [
+            [event(str(i), model=f'm{i}') for i in range(MAX_MODELS + 1)],
+            [event(model='m' * 193)],
+            [event(str(i), provider='p' * 192, model=f'{i:03}' + 'm' * 189) for i in range(180)],
+        ]
+        for records in cases:
+            with self.subTest(records=len(records)):
+                self.save('session.jsonl', *records, event('yesterday', timestamp=NOW - 86400))
+                original = self.scanner.snapshot(NOW)
+                with self.assertRaises(ValueError): encode_snapshot(original)
+                with patch.object(self.scanner, 'snapshot', return_value=original), \
+                        patch('daemon.usage.clock.time', return_value=NOW + 86400):
+                    s, payload = collect(self.scanner)
+                self.assertEqual(s['status'], 'unavailable')
+                self.assertEqual(s['epoch'], int(NOW))
+                self.assertEqual(s['date'], '2026-10-16')
+                self.assertEqual(s['yesterday'], original['yesterday'])
+                self.assertEqual(s['yesterday']['status'], 'ok')
+                self.assertEqual(s['yesterday']['totals']['cost'], .25)
+                self.assertEqual(json.loads(payload), s)
+                self.assertLessEqual(len(payload), MAX_FRAME_BYTES + 1)  # newline is the delimiter
+
+    def test_unencodable_yesterday_falls_back_to_both_unavailable(self):
+        s = self.scanner.snapshot(NOW)
+        s['yesterday']['date'] = 'x' * MAX_FRAME_BYTES
+        with patch.object(self.scanner, 'snapshot', return_value=s):
+            fallback, payload = collect(self.scanner)
+        self.assertEqual(fallback['status'], 'unavailable')
+        self.assertEqual(fallback['yesterday']['status'], 'unavailable')
+        self.assertEqual(fallback['yesterday']['date'], '2026-10-15')
+        self.assertEqual(fallback['epoch'], int(NOW))
+        self.assertEqual(json.loads(payload), fallback)
+
+    def test_yesterday_bounds_legacy_fixture_and_once(self):
+        s = self.scanner.snapshot(NOW)
+        legacy = dict(s)
+        del legacy['yesterday']
+        self.assertEqual(json.loads(encode_snapshot(legacy)), legacy)
+        for field, value in [('tokens', MAX_COUNT + 1), ('tokens', True), ('cost', float(MAX_COST) + 1)]:
+            with self.subTest(field=field, value=value):
+                invalid = json.loads(encode_snapshot(s))
+                invalid['yesterday']['totals'][field] = value
+                with self.assertRaises(ValueError): encode_snapshot(invalid)
+        result = subprocess.run([sys.executable, '-m', 'daemon.tokenmeter', '--once', '--pi-dir', str(self.root)],
+                                cwd=Path(__file__).resolve().parents[2], capture_output=True, text=True, check=True, timeout=10)
+        once = json.loads(result.stdout)
+        self.assertEqual(once['v'], 1)
+        self.assertEqual(once['status'], 'ok')
+        self.assertEqual(once['yesterday']['status'], 'ok')
+        local_date = datetime.strptime(once['date'], '%Y-%m-%d').date()
+        self.assertEqual(once['yesterday']['date'], (local_date - timedelta(days=1)).isoformat())
+        self.assertLessEqual(len(encode_snapshot(once)), MAX_FRAME_BYTES + 1)
 
     def test_wire_bounds_and_utf8_identity(self):
         self.save('a.jsonl', event())

@@ -24,8 +24,15 @@ def collect(scanner: UsageScanner) -> tuple[dict, bytes]:
         payload = encode_snapshot(snapshot)
     except ValueError as error:
         LOG.error('%s; sending unavailable, not truncated data', error)
-        snapshot = unavailable_snapshot(issues=max(1, snapshot['issues']))
-        payload = encode_snapshot(snapshot)
+        fallback = unavailable_snapshot(snapshot['epoch'], issues=max(1, snapshot['issues']))
+        if 'yesterday' in snapshot:
+            fallback['yesterday'] = snapshot['yesterday']
+        try:
+            payload = encode_snapshot(fallback)
+        except ValueError:
+            fallback = unavailable_snapshot(snapshot['epoch'], issues=max(1, snapshot['issues']))
+            payload = encode_snapshot(fallback)
+        snapshot = fallback
     return snapshot, payload
 
 

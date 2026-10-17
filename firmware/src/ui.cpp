@@ -13,6 +13,7 @@ static const meter::Snapshot* snapshot;
 static uint64_t elapsed;
 static bool connected;
 static size_t page = 0;
+static meter::View view = meter::View::Today;
 static meter::Swipe pending = meter::Swipe::None;
 static meter::TouchGesture gesture;
 static lv_obj_t *dateLabel, *home, *details, *period, *amount, *currency, *age, *tokens, *records;
@@ -52,11 +53,28 @@ static void disabled(lv_obj_t* obj, bool disable) {
     else lv_obj_remove_state(obj, LV_STATE_DISABLED);
 }
 static void refresh();
-static void navigate(int action) {
-    if (action == 2) page = 0;
-    else if (action > 0) page = meter::nextPage(page, snapshot ? snapshot->count : 0);
-    else page = meter::prevPage(page);
+static void navigate(meter::Swipe action) {
+    auto oldView=view;
+    size_t oldPage=page;
+    if (action==meter::Swipe::Home) { view=meter::View::Today; page=0; }
+    else if (action==meter::Swipe::Yesterday) { view=meter::View::Yesterday; page=0; }
+    else if (action==meter::Swipe::Models) {
+        if (snapshot && snapshot->status!=meter::Status::Unavailable && snapshot->count) {
+            view=meter::View::Details; page=1;
+        }
+    } else if (view==meter::View::Details && action==meter::Swipe::Next)
+        page=meter::nextPage(page,snapshot?snapshot->count:0);
+    else if (view==meter::View::Details && action==meter::Swipe::Prev)
+        page=meter::prevPage(page);
     refresh();
+    if (view!=oldView || page!=oldPage) {
+        // Reset interrupted native fades; background data refreshes never start one.
+        for (auto* object : {home,details}) {
+            lv_anim_delete(object,nullptr);
+            lv_obj_remove_local_style_prop(object,LV_STYLE_OPA,0);
+        }
+        lv_obj_fade_in(view==meter::View::Details?details:home,120,0);
+    }
 }
 static void click(lv_event_t* e) {
     // Release callbacks precede uiTouch; inspect the final point before accepting a tap.
@@ -65,10 +83,11 @@ static void click(lv_event_t* e) {
     lv_point_t point;
     lv_indev_get_point(input,&point);
     if (!gesture.tapAllowed(point.x,point.y)) return;
-    auto action = reinterpret_cast<intptr_t>(lv_event_get_user_data(e));
-    navigate(static_cast<int>(action));
+    auto action=static_cast<meter::Swipe>(reinterpret_cast<intptr_t>(lv_event_get_user_data(e)));
+    if (view==meter::View::Yesterday && pressTarget==modelsButton) action=meter::Swipe::Home;
+    navigate(action);
 }
-static lv_obj_t* button(lv_obj_t* parent, int x, int y, int w, const char* text, int action, bool dark=false) {
+static lv_obj_t* button(lv_obj_t* parent, int x, int y, int w, const char* text, meter::Swipe action, bool dark=false) {
     auto* b = lv_button_create(parent);
     lv_obj_remove_style_all(b); lv_obj_set_pos(b, x, y); lv_obj_set_size(b, w, 48);
     lv_obj_set_style_bg_color(b, lv_color_hex(dark ? 0 : 0x202326), 0);
@@ -121,7 +140,7 @@ void uiBegin() {
     }
     box(home,32,341,416,1,0x3a3a3a);
     records=label(home,31,357,295,&font_16,Gray,"-- records");
-    modelsButton=button(home,328,345,120,"MODELS >",1,true);
+    modelsButton=button(home,328,345,120,"MODELS >",meter::Swipe::Models,true);
 
     detailTitle=label(details,31,14,240,&font_20,White,"TODAY MODELS");
     detailState=label(details,31,45,246,&font_16,Gray,"provider/model");
@@ -139,26 +158,33 @@ void uiBegin() {
     }
     pairCount=label(details,31,299,330,&font_16,Gray,"");
     pageCount=label(details,365,299,83,&font_16,White,"",true);
-    homeButton=button(details,32,327,120,"< HOME",2);
-    prevButton=button(details,168,327,112,"< PREV",-1);
-    nextButton=button(details,296,327,152,"NEXT >",1);
+    homeButton=button(details,32,327,120,"< HOME",meter::Swipe::Home);
+    prevButton=button(details,168,327,112,"< PREV",meter::Swipe::Prev);
+    nextButton=button(details,296,327,152,"NEXT >",meter::Swipe::Next);
     refresh();
 }
 static void refresh() {
-    const auto* s=snapshot;
+    const auto* data=snapshot;
+    bool todayUsable=data && data->status!=meter::Status::Unavailable;
+    if (view==meter::View::Details) {
+        if (data) page=std::min(page,meter::pages(data->count));
+        if (!todayUsable || !page) { view=meter::View::Today; page=0; }
+    }
+    bool yesterday=view==meter::View::Yesterday;
+    const meter::DaySummary* s=data;
+    if (yesterday) s=data && data->yesterday.date[0]?&data->yesterday:nullptr;
     bool usable=s && s->status!=meter::Status::Unavailable;
     bool noRecords=usable && s->status==meter::Status::Partial && !s->records && !s->cost.known;
     bool showCounts=usable && !noRecords;
-    bool old=s && meter::oldDay(*s,elapsed);
-    bool stale=s && meter::stale(*s,elapsed);
-    if (!usable) page=0;
-    if (s) page=std::min(page,meter::pages(s->count));
-    hidden(home,page!=0); hidden(details,page==0);
+    bool old=data && meter::oldDay(*data,elapsed);
+    bool stale=data && meter::stale(*data,elapsed);
+    hidden(home,view==meter::View::Details); hidden(details,view!=meter::View::Details);
     char text[96], value[40];
     // Always retain the source date; never relabel an old day TODAY.
     setText(dateLabel,s?s->date:"--");
-    const char* day=old?"OLD DAY":"TODAY";
-    if (!s) snprintf(text,sizeof text,"NO DATA YET");
+    const char* day=old?"OLD DAY":yesterday?"YESTERDAY":"TODAY";
+    if (!s) snprintf(text,sizeof text,"%s",yesterday?"YESTERDAY · NO DATA":"NO DATA YET");
+    else if (!usable && yesterday) snprintf(text,sizeof text,"%s · SOURCE UNAVAILABLE%s",day,stale?" · STALE":"");
     else if (!usable) snprintf(text,sizeof text,"SOURCE UNAVAILABLE%s",stale?" · STALE":"");
     else snprintf(text,sizeof text,"%s%s%s",day,stale?" · STALE":"",s->status==meter::Status::Partial?" · PARTIAL SOURCE":"");
     setText(period,text);
@@ -185,8 +211,9 @@ static void refresh() {
         snprintf(text,sizeof text,"%s records%s",value,connected?"":" · OFFLINE");
     } else snprintf(text,sizeof text,"%s%s",noRecords?"NO READABLE RECORDS":"WAITING",connected?"":" · OFFLINE");
     setText(records,text);
-    disabled(modelsButton,!usable || !s->count);
-    if (!page) return;
+    setText(lv_obj_get_child(modelsButton,0),yesterday?"HOME >":"MODELS >");
+    disabled(modelsButton,!yesterday && (!usable || !data->count));
+    if (view!=meter::View::Details) return;
     snprintf(text,sizeof text,"%s MODELS",day); setText(detailTitle,text);
     snprintf(text,sizeof text,"%s%s",s->status==meter::Status::Partial?"PARTIAL SOURCE":"provider/model",stale?" · STALE":"");
     setText(detailState,text);
@@ -194,10 +221,10 @@ static void refresh() {
     setText(dayCaption,!s->cost.known?"UNPRICED":s->unpriced?"PARTIAL PRICE":"DAY TOTAL");
     for (size_t i=0;i<2;++i) {
         size_t index=(page-1)*2+i;
-        bool empty=index>=s->count;
+        bool empty=index>=data->count;
         for (auto* object : {providers[i],models[i],costs[i],rowTokens[i],rowRecords[i]}) hidden(object,empty);
         if (empty) continue;
-        const auto& row=s->rows[index];
+        const auto& row=data->rows[index];
         meter::identity(row.provider,20,value,sizeof value); snprintf(text,sizeof text,"%s/",value);
         setText(providers[i],text);
         meter::identity(row.model,14,value,sizeof value); setText(models[i],value);
@@ -208,11 +235,11 @@ static void refresh() {
         snprintf(text,sizeof text,"%s rec%s",value,!row.cost.known?" · UNPRICED":row.unpriced?" · PARTIAL":"");
         setText(rowRecords[i],text);
     }
-    snprintf(text,sizeof text,"%u pairs · by cost%s",unsigned(s->count),connected?"":" · OFFLINE");
+    snprintf(text,sizeof text,"%u pairs · by cost%s",unsigned(data->count),connected?"":" · OFFLINE");
     setText(pairCount,text);
-    snprintf(text,sizeof text,"%u/%u",unsigned(page),unsigned(meter::pages(s->count)));
+    snprintf(text,sizeof text,"%u/%u",unsigned(page),unsigned(meter::pages(data->count)));
     setText(pageCount,text);
-    disabled(prevButton,page==1); disabled(nextButton,page==meter::pages(s->count));
+    disabled(prevButton,page==1); disabled(nextButton,page==meter::pages(data->count));
 }
 void uiUpdate(const meter::Snapshot* s, uint64_t seconds, bool online) {
     snapshot=s; elapsed=seconds; connected=online; refresh();
@@ -221,24 +248,22 @@ void uiTouch(bool pressed, int x, int y) {
     if (pressed && !gesture.down && !gesture.suppressed) {
         lv_point_t point={x,y};
         pressTarget=nullptr;
-        if (!page) {
+        if (view!=meter::View::Details) {
             if (lv_obj_hit_test(modelsButton,&point)) pressTarget=modelsButton;
         } else {
             for (auto* b : {homeButton,prevButton,nextButton})
                 if (lv_obj_hit_test(b,&point)) { pressTarget=b; break; }
         }
     }
-    auto action=gesture.update(pressed,x,y,page!=0);
+    auto action=gesture.update(pressed,x,y,view);
     if (action!=meter::Swipe::None) { pending=action; pressTarget=nullptr; }
 }
 void uiCancelTouch() {
     pending=meter::Swipe::None; pressTarget=nullptr; gesture.cancel();
 }
-void uiHome() { uiCancelTouch(); navigate(2); }
+void uiHome() { uiCancelTouch(); navigate(meter::Swipe::Home); }
 bool uiPoll() {
     auto action=pending; pending=meter::Swipe::None;
-    if (action==meter::Swipe::Home) navigate(2);
-    else if (action==meter::Swipe::Models || action==meter::Swipe::Next) navigate(1);
-    else if (action==meter::Swipe::Prev) navigate(-1);
+    if (action!=meter::Swipe::None) navigate(action);
     return action!=meter::Swipe::None;
 }

@@ -62,12 +62,12 @@ source += "int main(){TouchDrvInterface touch;\n" + config + r'''
   for(int x:{0,32,92,200,388,479})for(int y:{0,81,200,432,450,479})point(x,y);
   meter::TouchGesture swipe;
   auto a=point(200,280),b=point(100,280);
-  assert(swipe.update(true,a.x,a.y,false)==meter::Swipe::None);
-  assert(swipe.update(true,b.x,b.y,false)==meter::Swipe::Models);
-  assert(swipe.update(false,b.x,b.y,true)==meter::Swipe::None);
+  assert(swipe.update(true,a.x,a.y,meter::View::Today)==meter::Swipe::None);
+  assert(swipe.update(true,b.x,b.y,meter::View::Today)==meter::Swipe::Models);
+  assert(swipe.update(false,b.x,b.y,meter::View::Details)==meter::Swipe::None);
   a=point(320,430);b=point(420,430);
-  assert(swipe.update(true,a.x,a.y,true)==meter::Swipe::None);
-  assert(swipe.update(true,b.x,b.y,true)==meter::Swipe::Home);
+  assert(swipe.update(true,a.x,a.y,meter::View::Details)==meter::Swipe::None);
+  assert(swipe.update(true,b.x,b.y,meter::View::Details)==meter::Swipe::Home);
   struct Tap {int rotation,x,y;};
   for(auto tap:{Tap{2,93,22},Tap{2,87,19},Tap{1,445,66},Tap{1,466,59}}){
    if(tap.rotation!=r)continue;

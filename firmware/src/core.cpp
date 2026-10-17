@@ -102,6 +102,33 @@ static bool before(const Row& a, const Row& b) {
     int c = strcmp(a.provider, b.provider);
     return c ? c < 0 : strcmp(a.model, b.model) < 0;
 }
+static bool readSummary(JsonObjectConst root, DaySummary& out, int64_t& day) {
+    if (!root["date"].is<const char*>() || !integer(root["issues"], out.issues)) return false;
+    JsonString date = root["date"].as<JsonString>();
+    if (date.size() != 10 || !dateDay(date.c_str(), day)) return false;
+    memcpy(out.date, date.c_str(), 10);
+    if (!root["status"].is<const char*>()) return false;
+    JsonString statusString = root["status"].as<JsonString>();
+    const char* status = statusString.c_str();
+    if (statusString.size() != strlen(status)) return false;
+    if (!strcmp(status, "ok")) out.status = Status::Ok;
+    else if (!strcmp(status, "partial")) out.status = Status::Partial;
+    else if (!strcmp(status, "unavailable")) out.status = Status::Unavailable;
+    else return false;
+    if (!root["totals"].is<JsonObjectConst>()) return false;
+    JsonObjectConst t = root["totals"].as<JsonObjectConst>();
+    if (!costValue(t, out.cost) || !integer(t["tokens"], out.tokens) || !integer(t["input"], out.input) ||
+        !integer(t["output"], out.output) || !integer(t["cache_read"], out.cacheRead) ||
+        !integer(t["cache_write"], out.cacheWrite) || !integer(t["records"], out.records) ||
+        !integer(t["unpriced"], out.unpriced) || out.unpriced > out.records) return false;
+    if (out.status == Status::Unavailable)
+        return !out.cost.known && !out.tokens && !out.input && !out.output && !out.cacheRead &&
+               !out.cacheWrite && !out.records && !out.unpriced;
+    if (!out.records)
+        return !out.tokens && !out.input && !out.output && !out.cacheRead && !out.cacheWrite &&
+               (out.cost.known ? out.cost.value == 0 : out.status == Status::Partial);
+    return out.cost.known != (out.unpriced == out.records);
+}
 bool parse(const char* bytes, size_t size, Snapshot& out, ArduinoJson::Allocator* allocator) {
     if (!size || size > FrameLimit || !utf8(bytes, size)) return false;
     Reader reader{bytes, size};
@@ -116,32 +143,21 @@ bool parse(const char* bytes, size_t size, Snapshot& out, ArduinoJson::Allocator
     JsonObjectConst root = doc.as<JsonObjectConst>();
     new (&out) Snapshot{}; // construct in PSRAM, never a snapshot-sized stack temporary
     uint64_t version;
+    int64_t day;
     if (!integer(root["v"], version) || version != 1 || !integer(root["epoch"], out.epoch) || out.epoch == 0 ||
         !integer(root["day_end"], out.dayEnd) || out.dayEnd <= out.epoch || out.dayEnd - out.epoch > 27*3600 ||
-        !root["utc_offset"].is<int>() || !integer(root["issues"], out.issues)) return false;
+        !root["utc_offset"].is<int>() || !readSummary(root, out, day)) return false;
     out.offset = root["utc_offset"].as<int>();
-    if (out.offset < -840 || out.offset > 840 || !root["date"].is<const char*>()) return false;
-    JsonString date = root["date"].as<JsonString>();
-    int64_t day;
-    if (date.size() != 10 || !dateDay(date.c_str(), day)) return false;
+    if (out.offset < -840 || out.offset > 840) return false;
     int64_t local = static_cast<int64_t>(out.epoch) + out.offset * 60;
     int64_t localDay = local >= 0 ? local / 86400 : (local - 86399) / 86400;
     if (day != localDay) return false;
-    memcpy(out.date, date.c_str(), 10);
-    if (!root["status"].is<const char*>()) return false;
-    JsonString statusString = root["status"].as<JsonString>();
-    const char* status = statusString.c_str();
-    if (statusString.size() != strlen(status)) return false;
-    if (!strcmp(status, "ok")) out.status = Status::Ok;
-    else if (!strcmp(status, "partial")) out.status = Status::Partial;
-    else if (!strcmp(status, "unavailable")) out.status = Status::Unavailable;
-    else return false;
-    if (!root["totals"].is<JsonObjectConst>() || !root["models"].is<JsonArrayConst>()) return false;
-    JsonObjectConst t = root["totals"].as<JsonObjectConst>();
-    if (!costValue(t, out.cost) || !integer(t["tokens"], out.tokens) || !integer(t["input"], out.input) ||
-        !integer(t["output"], out.output) || !integer(t["cache_read"], out.cacheRead) ||
-        !integer(t["cache_write"], out.cacheWrite) || !integer(t["records"], out.records) ||
-        !integer(t["unpriced"], out.unpriced) || out.unpriced > out.records) return false;
+    if (root.containsKey("yesterday")) {
+        int64_t previousDay;
+        if (!root["yesterday"].is<JsonObjectConst>() ||
+            !readSummary(root["yesterday"].as<JsonObjectConst>(), out.yesterday, previousDay) || previousDay != day-1) return false;
+    }
+    if (!root["models"].is<JsonArrayConst>()) return false;
     JsonArrayConst rows = root["models"].as<JsonArrayConst>();
     if (rows.size() > PairLimit) return false;
     uint64_t tokens = 0, records = 0, unpriced = 0;
@@ -162,10 +178,7 @@ bool parse(const char* bytes, size_t size, Snapshot& out, ArduinoJson::Allocator
             if (!strcmp(row.provider, out.rows[i].provider) && !strcmp(row.model, out.rows[i].model)) return false;
     }
     if (tokens != out.tokens || records != out.records || unpriced != out.unpriced) return false;
-    if (out.status == Status::Unavailable) {
-        return out.count == 0 && !out.cost.known && out.tokens == 0 && out.input == 0 && out.output == 0 &&
-               out.cacheRead == 0 && out.cacheWrite == 0 && out.records == 0 && out.unpriced == 0;
-    }
+    if (out.status == Status::Unavailable) return out.count == 0;
     // Absolute cap stays below one cent even for the largest allowed monetary value.
     double tolerance = std::min(0.004, std::max(1e-9, std::fabs(sum) * 2e-15));
     if (out.cost.known != known || (known && std::fabs(out.cost.value - sum) > tolerance)) return false;
@@ -209,23 +222,23 @@ void identity(const char* original, size_t columns, char* out, size_t size) {
 size_t pages(size_t pairs) { return (pairs + 1)/2; }
 size_t nextPage(size_t page, size_t pairs) { return std::min(page + 1, pages(pairs)); }
 size_t prevPage(size_t page) { return page > 1 ? page - 1 : page; }
-Swipe swipe(int dx, int dy, bool details) {
+Swipe swipe(int dx, int dy, View view) {
     if (std::abs(dx) >= SwipeThreshold && std::abs(dx) > std::abs(dy)*3/2) {
-        if (dx < 0 && !details) return Swipe::Models;
-        if (dx > 0 && details) return Swipe::Home;
+        if (view == View::Today) return dx < 0 ? Swipe::Models : Swipe::Yesterday;
+        if ((dx < 0 && view == View::Yesterday) || (dx > 0 && view == View::Details)) return Swipe::Home;
     }
-    if (details && std::abs(dy) >= SwipeThreshold && std::abs(dy) > std::abs(dx)*3/2)
+    if (view == View::Details && std::abs(dy) >= SwipeThreshold && std::abs(dy) > std::abs(dx)*3/2)
         return dy < 0 ? Swipe::Next : Swipe::Prev;
     return Swipe::None;
 }
-Swipe TouchGesture::update(bool pressed, int x, int y, bool inDetails) {
+Swipe TouchGesture::update(bool pressed, int x, int y, View view) {
     if (suppressed) {
         if (!pressed) suppressed = false;
         return Swipe::None;
     }
     if (!down) {
         if (pressed) {
-            down = true; moved = consumed = false; details = inDetails;
+            down = true; moved = consumed = false; origin = view;
             startX = x; startY = y;
         }
         return Swipe::None;
@@ -234,7 +247,7 @@ Swipe TouchGesture::update(bool pressed, int x, int y, bool inDetails) {
     if (!consumed) {
         int dx = x - startX, dy = y - startY;
         moved = moved || std::abs(dx) >= SwipeThreshold || std::abs(dy) >= SwipeThreshold;
-        action = swipe(dx, dy, details);
+        action = swipe(dx, dy, origin);
         if (action != Swipe::None) consumed = true;
     }
     if (!pressed) down = false;

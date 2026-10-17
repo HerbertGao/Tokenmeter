@@ -13,14 +13,18 @@ struct Row {
     uint64_t tokens = 0, records = 0, unpriced = 0;
 };
 enum class Status { Ok, Partial, Unavailable };
-struct Snapshot {
+struct DaySummary {
     char date[11]{};
-    uint64_t epoch = 0, dayEnd = 0, issues = 0;
-    int offset = 0;
+    uint64_t issues = 0;
     Status status = Status::Unavailable;
     Cost cost;
     uint64_t tokens = 0, input = 0, output = 0, cacheRead = 0, cacheWrite = 0;
     uint64_t records = 0, unpriced = 0;
+};
+struct Snapshot : DaySummary {
+    uint64_t epoch = 0, dayEnd = 0;
+    int offset = 0;
+    DaySummary yesterday;
     size_t count = 0;
     Row rows[PairLimit];
 };
@@ -40,13 +44,15 @@ void identity(const char* original, size_t columns, char* out, size_t size);
 size_t pages(size_t pairs);
 size_t nextPage(size_t page, size_t pairs); // 0 is overview, 1..N are details
 size_t prevPage(size_t page);
-enum class Swipe { None, Models, Home, Next, Prev };
+enum class View { Today, Yesterday, Details };
+enum class Swipe { None, Models, Home, Yesterday, Next, Prev };
 constexpr int SwipeThreshold = 50;
-Swipe swipe(int dx, int dy, bool details);
+Swipe swipe(int dx, int dy, View view);
 struct TouchGesture {
-    bool down = false, moved = false, consumed = false, suppressed = false, details = false;
+    bool down = false, moved = false, consumed = false, suppressed = false;
+    View origin = View::Today;
     int startX = 0, startY = 0;
-    Swipe update(bool pressed, int x, int y, bool inDetails);
+    Swipe update(bool pressed, int x, int y, View view);
     bool tapAllowed(int x, int y) const;
     void cancel();
 };

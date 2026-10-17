@@ -1,6 +1,6 @@
 # Tokenmeter
 
-把 Waveshare **ESP32-S3-Touch-AMOLED-2.16（480×480）**用作 Pi 今日 token 与日志费用桌面仪表。
+把 Waveshare **ESP32-S3-Touch-AMOLED-2.16（480×480）**用作 Pi 今日与上一日 token／日志费用桌面仪表。
 
 采用左对齐布局与品牌配色：首页费用与总 token，明细按 `provider/model` 分组、每页两条、可按钮或上下滑动翻页。不 fork 旧桌面 App，不需要 Claude 订阅、用量 API、数据库或 Wi-Fi。
 
@@ -10,7 +10,11 @@
 
 以上为**当前固件真实 LVGL 界面代码的离线示例渲染，非实机截图或照片**。统计为合成示例，不代表真实用量、账单或模型定价；字库、页面布局与颜色均直接来自固件。
 
-原尺寸单页：[首页](docs/images/home.png) · [明细 1](docs/images/models-1.png) · [明细 2](docs/images/models-2.png)。渲染说明见 [docs/images/README.md](docs/images/README.md)。
+原尺寸单页：[今日首页](docs/images/home.png) · [上一日汇总](docs/images/yesterday.png) · [今日明细 1](docs/images/models-1.png) · [今日明细 2](docs/images/models-2.png)。渲染说明见 [docs/images/README.md](docs/images/README.md)。
+
+上一日沿用首页布局，只看这一天的总计，不提供更早日期或昨日模型列表：
+
+![上一日汇总示例，同样为离线合成数据渲染](docs/images/yesterday.png)
 
 ## macOS 一键脚本
 
@@ -54,7 +58,7 @@ cd Tokenmeter
 python3 -m daemon.tokenmeter --once
 ```
 
-`--once` 仅需 Python 标准库，输出今日统计 JSON，不加载 Bluetooth。默认读 `PI_AGENT_DIR/sessions`；未设置时读 `~/.pi/agent/sessions`。
+`--once` 仅需 Python 标准库，输出今日统计及 `yesterday` 上一日摘要 JSON，不加载 Bluetooth。默认读 `PI_AGENT_DIR/sessions`；未设置时读 `~/.pi/agent/sessions`。
 
 自定义或合并多个 Pi agent 目录：
 
@@ -103,11 +107,14 @@ pio run -d firmware -t upload --upload-port /dev/cu.usbmodemXXXX
 
 保留现有 A+D 页面坐标、字号及按钮尺寸，没有新增大按钮或修改设计预览。
 
-- 首页左滑进入明细，明细右滑回首页；反方向不重复切换。
-- 明细上滑下一页、下滑上一页；第一页下滑仍留在明细。首页上下滑不翻页。
-- GPIO18 自定义实体键消抖30ms后回首页，按住不连发；不是 BOOT、PWR 或 RESET，也不做双击/长按模式。
+- 今日首页右滑进入左边的上一日汇总页；上一日页左滑回今日，继续右滑没有更早日期。昨日底部 `HOME >` 按钮也回今日，不提供昨日模型明细。
+- 今日首页左滑进入今日模型明细，明细右滑回今日。
+- 明细上滑下一页、下滑上一页；第一页下滑仍留在明细。今日与上一日汇总页上下滑不翻页。
+- GPIO18 自定义实体键消抖30ms后始终回今日首页，按住不连发；不是 BOOT、PWR 或 RESET，也不做双击/长按模式。
 - QMI8658 加速度计约100ms采样，方向稳定400ms才切换四个正交方向。平放、接近45°边界或明显晃动时保持原方向；触摸期间暂停判向。
 - 使用实机校准后的CST原生坐标，不再额外交换XY或镜像X；LVGL统一做显示旋转和触摸逆变换，按钮与滑动方向都相对当前画面。旋转不重置当前页和数据，仅多用38,400 bytes PSRAM条带缓冲。
+
+用户实际切换日视图或明细页时，内容区用 LVGL 原生约120ms淡入，标题栏固定；快速切页会取消并复位前一个淡入。边界无效滑动、每分钟数据更新及连接/STALE变化不会重新播放动画，不增加截图缓冲或动画框架。
 
 屏内原按钮仍可点，也可从普通/灰色按钮区域起手滑动。沿有效方向达到50px即切页，不必松手；同一次按住只导航一次。滑动后不再触发按钮，快速松手也复核最终位置，防止拖入HOME等按钮误点。未变化的文字、字体和页面可见性不重复设置，避免无变化重绘整块页面。
 
@@ -115,7 +122,9 @@ pio run -d firmware -t upload --upload-port /dev/cu.usbmodemXXXX
 
 ## 用量与协议
 
-统计主机本地自然日，按日志中明确的 provider 与 model/responseModel 配对。复制进 fork 的稳定 ID 记录只计一次；工具、摘要和独立 usage 事件均处理，缺少归属进入 unknown。输入、输出、缓存读取与写入按 Pi 原生口径求和，不重复叠加 reasoning。Qoder 兼容 usd_equivalent。
+统计主机本地的今日与上一日自然日，不是滚动24小时。单次扫描仅在内存保留这两日的允许元数据，独立汇总；今日按日志中明确的 provider 与 model/responseModel 配对展示明细，昨日只发送总计。复制进 fork 的稳定 ID 记录只计一次；工具、摘要和独立 usage 事件均处理，缺少归属进入 unknown。输入、输出、缓存读取与写入按 Pi 原生口径求和，不重复叠加 reasoning。Qoder 兼容 usd_equivalent。
+
+要查看上一日，需要使用更新后的 daemon 和固件。**更新代码后，必须先在旧终端按 `Ctrl+C` 停止已经运行的 daemon，再重新运行 `./start-daemon.sh`；旧 Python 进程不会自动加载新代码。** 若只刷固件而旧进程仍发送旧快照，昨日页会显示 NO DATA，重启 daemon 后再等待首次推送。BLE v1 只增加可选 `yesterday` 摘要；新固件接旧 daemon 时昨日页显示 NO DATA，不伪造零，旧固件可继续读取今日字段。重启后由 daemon 重发，不在设备上持久保存历史；午夜收到新快照时，昨日自动变成刚结束的本地自然日。
 
 金额以日志 USD 为准，不是供应商最终账单。缺价显示未知或已知小计，不从 token 猜费用。设备在120秒未更新或跨本地午夜时自行标 stale，不把旧数据改称今日数据。
 
@@ -124,7 +133,7 @@ pio run -d firmware -t upload --upload-port /dev/cu.usbmodemXXXX
 
 JSONL 容器在本机进程内解析，但仅缓存/输出/发送允许的用量字段；不保留或发送正文，不读取认证文件。当前 BLE 未认证、未加密，附近客户端可能注入数据，仅适合可信近距环境；这不是可信计费终端。
 
-设备快照上限64KiB、256个分组、每个身份192 UTF-8字节。超限显示 unavailable，不静默丢弃条目。原始身份保留；初版字体只覆盖 ASCII 与常用标点，其他文字有显示限制。
+设备整包（含昨日摘要）上限64KiB、今日256个分组、每个身份192 UTF-8字节。昨日总计超数值上限只使昨日 unavailable；今日超限回退时尽量保留合法昨日摘要，不静默丢弃今日条目。原始身份保留；初版字体只覆盖 ASCII 与常用标点，其他文字有显示限制。
 
 ## 检查
 
@@ -149,6 +158,7 @@ python3 -m unittest discover -s scripts/tests -v
 sh firmware/checks/run.sh
 python3 firmware/checks/minute.py
 python3 firmware/checks/rotation.py
+python3 firmware/checks/ui.py
 sh firmware/checks/run.sh /tmp/tokenmeter-live.json
 ```
 

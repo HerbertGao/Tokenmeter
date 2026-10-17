@@ -27,7 +27,7 @@ def day_window(now: float) -> tuple[str, float, float, int]:
     return local.date().isoformat(), start, end, int(offset.total_seconds() // 60)
 
 
-def empty_totals(cost: float | None = 0.0) -> dict:
+def empty_totals(cost: float | Decimal | None = 0.0) -> dict:
     return dict(cost=cost, tokens=0, input=0, output=0, cache_read=0,
                 cache_write=0, records=0, unpriced=0)
 
@@ -35,8 +35,20 @@ def empty_totals(cost: float | None = 0.0) -> dict:
 def unavailable_snapshot(now: float | None = None, issues: int = 1) -> dict:
     now = clock.time() if now is None else now
     date, _, end, offset = day_window(now)
+    yesterday = (datetime.fromtimestamp(now).date() - timedelta(days=1)).isoformat()
     return dict(v=1, date=date, epoch=int(now), day_end=int(end), utc_offset=offset,
-                status='unavailable', issues=issues, totals=empty_totals(None), models=[])
+                status='unavailable', issues=issues, totals=empty_totals(None), models=[],
+                yesterday=dict(date=yesterday, status='unavailable', issues=issues, totals=empty_totals(None)))
+
+
+def _check_bounds(values: dict) -> None:
+    cost = values['cost']
+    if cost is not None and (not math.isfinite(cost) or not 0 <= cost <= MAX_COST):
+        raise ValueError('cost exceeds device limit')
+    for key, value in values.items():
+        if key not in ('provider', 'model', 'cost'):
+            if type(value) is not int or not 0 <= value <= MAX_COUNT:
+                raise ValueError('count exceeds device limit')
 
 
 def encode_snapshot(snapshot: dict) -> bytes:
@@ -49,13 +61,9 @@ def encode_snapshot(snapshot: dict) -> bytes:
             if len(row[key].encode('utf-8')) > MAX_ID_BYTES:
                 raise ValueError('provider/model identity exceeds device limit')
     for values in [snapshot['totals'], *rows]:
-        cost = values['cost']
-        if cost is not None and (not math.isfinite(cost) or not 0 <= cost <= MAX_COST):
-            raise ValueError('cost exceeds device limit')
-        for key, value in values.items():
-            if key not in ('provider', 'model', 'cost'):
-                if type(value) is not int or not 0 <= value <= MAX_COUNT:
-                    raise ValueError('count exceeds device limit')
+        _check_bounds(values)
+    if 'yesterday' in snapshot:
+        _check_bounds(snapshot['yesterday']['totals'])
     raw = json.dumps(snapshot, ensure_ascii=False, separators=(',', ':'), allow_nan=False).encode('utf-8')
     if len(raw) > MAX_FRAME_BYTES:
         raise ValueError('snapshot exceeds device frame limit')
@@ -171,6 +179,32 @@ class CachedFile:
     issues: int
 
 
+def _aggregate(records, issues: int, groups: dict | None = None) -> dict:
+    totals = empty_totals(Decimal(0))
+    for record in records:
+        for field, value in zip(('input', 'output', 'cache_read', 'cache_write'), record.splits):
+            totals[field] += value
+        consumers = [totals]
+        if groups is not None:
+            pair = (record.provider, record.model)
+            consumers.append(groups.setdefault(pair, dict(provider=pair[0], model=pair[1], cost=Decimal(0),
+                                                         tokens=0, records=0, unpriced=0)))
+        for values in consumers:
+            values['tokens'] += record.tokens
+            values['records'] += 1
+            values['unpriced'] += int(record.cost is None)
+            if record.cost is not None:
+                values['cost'] += record.cost
+    if groups is not None:
+        for row in groups.values():
+            if row['unpriced'] == row['records']:
+                row['cost'] = None
+    totals['cost'] = (float(totals['cost'])
+                      if totals['records'] > totals['unpriced'] or not totals['records'] and not issues
+                      else None)
+    return totals
+
+
 class UsageScanner:
     def __init__(self, agent_dirs: list[Path]):
         self.roots = sorted({p.expanduser().resolve() / 'sessions' for p in agent_dirs})
@@ -202,9 +236,11 @@ class UsageScanner:
     def snapshot(self, now: float | None = None) -> dict:
         now = clock.time() if now is None else now
         date, start, end, offset = day_window(now)
-        if self.window != (start, end):
+        yesterday = datetime.fromtimestamp(now).date() - timedelta(days=1)
+        yesterday_start = datetime.combine(yesterday, time()).timestamp()
+        if self.window != (yesterday_start, end):
             self.cache.clear()
-            self.window = (start, end)
+            self.window = (yesterday_start, end)
         paths, issues, readable_roots = set(), 0, 0
         for root in self.roots:
             if not root.is_dir():
@@ -230,7 +266,7 @@ class UsageScanner:
                 signature = (stat.st_dev, stat.st_ino, stat.st_mtime_ns, stat.st_ctime_ns, stat.st_size)
                 cached = self.cache.get(path)
                 if cached is None or cached.signature != signature:
-                    cached = self._read(path, signature, start, end)
+                    cached = self._read(path, signature, yesterday_start, end)
                     self.cache[path] = cached
                 readable_files += 1
                 issues += cached.issues
@@ -252,34 +288,19 @@ class UsageScanner:
         if readable_roots == 0 and readable_files == 0 or paths and readable_files == 0:
             return unavailable_snapshot(now, max(1, issues))
         groups: dict[tuple[str, str], dict] = {}
-        totals = empty_totals()
-        total_cost = Decimal(0)
-        priced = 0
-        for record in unique.values():
-            pair = (record.provider, record.model)
-            group = groups.setdefault(pair, dict(provider=pair[0], model=pair[1], cost=Decimal(0),
-                                                   tokens=0, records=0, unpriced=0))
-            group['tokens'] += record.tokens
-            group['records'] += 1
-            totals['tokens'] += record.tokens
-            totals['records'] += 1
-            for field, value in zip(('input', 'output', 'cache_read', 'cache_write'), record.splits):
-                totals[field] += value
-            if record.cost is None:
-                group['unpriced'] += 1
-                totals['unpriced'] += 1
-            else:
-                group['cost'] += record.cost
-                total_cost += record.cost
-                priced += 1
+        totals = _aggregate((r for r in unique.values() if r.timestamp >= start), issues, groups)
+        yesterday_totals = _aggregate((r for r in unique.values() if r.timestamp < start), issues)
+        yesterday_summary = dict(date=yesterday.isoformat(), status='partial' if issues else 'ok',
+                                 issues=issues, totals=yesterday_totals)
+        try:
+            _check_bounds(yesterday_totals)
+        except ValueError:
+            yesterday_summary.update(status='unavailable', issues=max(1, issues), totals=empty_totals(None))
         rows = list(groups.values())
-        for row in rows:
-            if row['unpriced'] == row['records']:
-                row['cost'] = None
         rows.sort(key=lambda r: (r['cost'] is None, -(r['cost'] or Decimal(0)), r['provider'], r['model']))
         for row in rows:
             if row['cost'] is not None:
                 row['cost'] = float(row['cost'])
-        totals['cost'] = float(total_cost) if priced or not unique and not issues else None
         return dict(v=1, date=date, epoch=int(now), day_end=int(end), utc_offset=offset,
-                    status='partial' if issues else 'ok', issues=issues, totals=totals, models=rows)
+                    status='partial' if issues else 'ok', issues=issues, totals=totals, models=rows,
+                    yesterday=yesterday_summary)
