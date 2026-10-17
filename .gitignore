@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+firmware/.pio/
+firmware/*.log
+firmware/fonts/*.log
+.DS_Store
+.cache/
+.pi/
+/reviews/
+.env
+.env.*
+auth.json
+*.pem
+*.key

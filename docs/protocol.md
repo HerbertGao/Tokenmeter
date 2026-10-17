@@ -1,0 +1,46 @@
+# Tokenmeter BLE v1
+
+用户已确认 `design-previews/2026-10-16-pi-meter-mixed/` 的 A 布局 + D 品牌色并授权开发；2026-10-17另行授权目标USB设备刷机并跳过备份，随后授权清理该设备旧蓝牙配对。修改旧服务或安装自启动仍不在本次范围。
+
+## Transport
+
+- Name: `Tokenmeter`.
+- Identity: chip-derived Bluetooth static-random address, set in RAM, not an NVS/eFuse configuration. This separates the application from the old factory-address HID identity/cache on macOS. It is stable across boots, not a privacy or authentication feature. Rediscover the peripheral rather than reusing the old Clawdmeter/macOS address.
+- Service: `544f4b45-4e4d-4554-4552-000000000001`.
+- RX: `544f4b45-4e4d-4554-4552-000000000002`, WRITE with response.
+- ACK: `544f4b45-4e4d-4554-4552-000000000003`, READ + NOTIFY. `ok` means a complete validated snapshot is committed in the main loop; `error` means rejection. No optimistic acknowledgement in the receive callback.
+- Exactly one compact UTF-8 JSON object followed by LF. JSON strings escape embedded newlines. The daemon sends sequential MTU-sized writes with response, at most 180 bytes each. No dependence on an oversized single GATT write. Only one outstanding frame; subscribe before sending, await ACK after the terminating LF.
+- A frame can contain at most **65536 bytes excluding LF**. Oversized or malformed frames are rejected, never partially applied. After overflow, discard until LF. Reset unfinished input on disconnect. Receive callbacks never call LVGL; hand off a complete frame to the main loop. Snapshot replacement is atomic.
+- Maximum **256 provider/model pairs**, and **192 UTF-8 bytes per provider or model**. Identities must be nonempty UTF-8 without C0/C1/DEL control characters, including embedded NUL. These are explicit RAM/input bounds, not silent truncation rules. The daemon reports an unavailable snapshot if a source snapshot cannot fit; do not drop rows to make it fit. All pairs within bounds remain available for local paging, including after disconnect.
+- No HID, refresh characteristic, pairing workflow, Wi-Fi or remote service. This initial GATT service is unencrypted; only usage metadata is transmitted, not secrets or messages. It is suitable for a trusted nearby environment, not an authenticated billing source.
+
+## Snapshot
+
+```json
+{"v":1,"date":"2026-10-16","epoch":1792123200,"day_end":1792166400,"utc_offset":480,"status":"ok","issues":0,"totals":{"cost":0.79,"tokens":3160000,"input":258800,"output":24200,"cache_read":2877000,"cache_write":0,"records":34,"unpriced":0},"models":[{"provider":"openai-codex","model":"gpt-5.4","cost":0.79,"tokens":3160000,"records":34,"unpriced":0}]}
+```
+
+The numbers above only illustrate the shape, not a live timestamp. In production `date` is the host's local calendar day; `epoch` is generation time in Unix seconds; `day_end` is the next local midnight in Unix seconds (DST aware); `utc_offset` is the host's current local offset in whole minutes, between -840 and 840. Require valid date, positive epoch, and epoch < day_end <= epoch + 27 hours. The UTC date of epoch + utc_offset * 60 must match date; do not display a malformed date as real usage.
+
+`status` is `ok`, `partial`, or `unavailable`. `partial` means source reading/parsing had issues, so totals are incomplete. `unavailable` means no trustworthy source snapshot (including configured path missing or protocol limits exceeded); totals are zero-valued placeholders with `cost: null`, models is empty, and the screen must show unavailable placeholders, NOT $0.00/0 tokens as valid usage.
+
+`cost` is a finite, nonnegative number or null. null means no usable price is known, not zero. Known zero is 0. `unpriced` counts records missing a valid price; if some are priced, cost contains the known subtotal and must be marked partial on screen. Currency is currently USD as recorded; not a supplier's final invoice. No price API or exchange-rate lookup. A partial snapshot with no readable usage records may also have null cost and zero records/unpriced/models: an unreadable source does not prove a free day.
+
+All token and count values are nonnegative integers, at most 9007199254740991; unpriced <= records. Monetary values are at most 1000000000000 USD to bound formatting and reject nonsensical input. Each model row has records > 0. Totals must equal the sum of rows for tokens, records and unpriced, and cost must equal the known row costs (allow normal floating-point roundoff, not a one-cent discrepancy). An empty existing source directory is valid no-usage data: cost 0, tokens 0, records 0, models empty. Missing source directories must never look like a clean zero day.
+
+Rows are sorted by known cost descending, null costs last; ties use provider then model. Pair identity is `(provider, model)`, never model alone or a slash-concatenated deduplication key. A display wraps provider/ and model to separate lines, but that does not create two aggregation levels.
+
+## Screen rules
+
+- 480×480, small Pi logo, A layout, coral costs, blue input/cache, gold output, white total tokens. Use the approved preview positions and fixed font sizes 16/20/24/32/48/96; dynamic labels, not transmitted screenshots.
+- Overview plus model detail pages, two rows per page, cost order, all rows accessible. Left swipe enters details only from overview; right swipe returns only from details. Vertical swipes page through details only; down on the first detail stays there. HOME and GPIO18's debounced physical key always return to overview; PREV/NEXT disabled at detail bounds. No large button or layout changes. Recognize swipes from any region, including enabled or disabled buttons, as soon as displacement reaches 50 pixels with the existing dominant-axis direction test; do not wait for release. Each press-to-release stroke navigates at most once and suppresses subsequent native button events. A button click must begin on that same button and remain below the movement threshold, including at the final release point; dragging into a button is not a click. Ambiguous diagonal motion does not navigate. Unchanged text, font and visibility must not invoke their repainting setters.
+- Automatic orientation reads QMI8658 acceleration, not gyro integration: four quadrants, 400ms stability, retain the current direction when flat/ambiguous/moving or while touching. Native CST coordinates match the CO5300 panel pixel basis on this board; do not add the legacy XY swap/X mirror before LVGL, which introduces an extra 90-degree offset. Display rotation and input inverse mapping use LVGL consistently; interpret gestures in logical screen coordinates, cancel in-progress touch across rotation, preserve page and snapshot. No daemon or BLE payload changes; no persistent orientation settings.
+- Main amount falls back to a smaller fixed font when necessary; keep `<$0.01` distinguishable from $0.00. Preserve original model/provider strings in state; display-only middle ellipsis must never change identity.
+- No data yet / source unavailable / unpriced / partial source have explicit labels and placeholders. A genuinely empty day is allowed to show zero.
+- Routine UI refresh is every 60 seconds; relative age displays whole minutes below one hour, then hours/days. Valid snapshots, connection changes and stale/old-day transitions refresh immediately. Do not slow input, LVGL or orientation polling to the UI refresh interval.
+- Stale is determined locally after 120 seconds without a valid snapshot, not only by a host flag. Estimate local day end with `epoch + elapsed_since_receive >= day_end`; mark old-day data stale rather than relabeling it today. Keep the previous valid snapshot on malformed BLE input. Disconnect does not make old data fresh.
+- Non-ASCII model/provider identities may not be covered by the initial ASCII display font; preserve original data, and use an explicit display fallback rather than reading or sending any additional content.
+
+## Scope
+
+No database, durable index, background worker service installation, desktop app, user-auth access, existing-service changes or automatic flashing. Build/run commands are manual and documented. The daemon reads local session JSONL containers and retains/exports only allowlisted usage metadata, never message bodies or credentials.

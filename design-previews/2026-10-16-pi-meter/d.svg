@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="480" viewBox="0 0 480 480" role="img" aria-labelledby="title desc">
+  <title id="title">Pi Meter — Direction D: Pi Color / Asymmetric</title>
+  <desc id="desc">Illustrative design preview for October 16, not firmware. An asymmetric editorial composition on black with small square category indices. Recorded cost is $0.79 USD; total usage is 3.16M tokens: input 258.8K, output 24.2K, cache read 2.88M. 34 requests, updated 18 seconds ago. Coral identifies cost, blue identifies input and cache read, gold identifies output, and white identifies the total.</desc>
+  <rect width="480" height="480" fill="#0c0c0f"/>
+  <svg x="32" y="32" width="34" height="34" viewBox="140 140 520 520" aria-hidden="true">
+    <path fill="#F09082" d="M165.29 165.29H517.36V400H400V282.65H165.29Z"/>
+    <path fill="#4D9ABF" d="M165.29 282.65H282.65V400H400V517.36H282.65V634.72H165.29Z"/>
+    <path fill="#F1BE58" d="M517.36 400H634.72V634.72H517.36Z"/>
+  </svg>
+  <g font-family="'Avenir Next', Avenir, sans-serif">
+    <text x="79" y="56" fill="#f5f3ef" font-size="18" font-weight="600" letter-spacing="1.5">PI METER</text>
+    <text x="448" y="55" text-anchor="end" fill="#b7b6bd" font-family="'SFMono-Regular', Menlo, Consolas, monospace" font-size="16">OCT 16</text>
+
+    <rect x="32" y="111" width="7" height="7" fill="#F09082"/>
+    <text x="95" y="189" fill="#F09082" font-size="106" font-weight="500" letter-spacing="-5">$0.79</text>
+    <text x="102" y="220" fill="#F09082" font-family="'SFMono-Regular', Menlo, Consolas, monospace" font-size="16" letter-spacing="0.5">USD · RECORDED</text>
+
+    <rect x="32" y="318" width="7" height="7" fill="#4D9ABF"/>
+    <rect x="32" y="388" width="7" height="7" fill="#4D9ABF"/>
+    <text x="64" y="288" fill="#f5f3ef" font-size="48" font-weight="600" letter-spacing="-1.8">3.16M<tspan dx="12" fill="#b7b6bd" font-size="18" font-weight="400" letter-spacing="0">tokens</tspan></text>
+
+    <g font-family="'SFMono-Regular', Menlo, Consolas, monospace">
+      <text x="64" y="329" fill="#4D9ABF" font-size="16">IN</text>
+      <text x="64" y="362" fill="#4D9ABF" font-size="27" letter-spacing="-0.5">258.8K</text>
+      <rect x="275" y="318" width="7" height="7" fill="#F1BE58"/>
+      <text x="296" y="329" fill="#F1BE58" font-size="16">OUT</text>
+      <text x="296" y="362" fill="#F1BE58" font-size="27" letter-spacing="-0.5">24.2K</text>
+      <text x="64" y="399" fill="#4D9ABF" font-size="16">CACHE READ</text>
+      <text x="236" y="399" fill="#4D9ABF" font-size="25" letter-spacing="-0.5">2.88M</text>
+      <text x="32" y="446" fill="#b7b6bd" font-size="16">34 requests</text>
+      <text x="448" y="446" text-anchor="end" fill="#b7b6bd" font-size="16">updated 18s ago</text>
+    </g>
+  </g>
+</svg>

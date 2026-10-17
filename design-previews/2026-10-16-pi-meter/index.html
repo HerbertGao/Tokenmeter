@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pi Meter · 480×480 设计方向</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;color:#e8e6e1;background:#202326;font-synthesis:none;color-scheme:dark}*{box-sizing:border-box}body{margin:0}a{color:inherit;text-underline-offset:4px}button,input{font:inherit}main{max-width:1104px;margin:auto;padding:36px 32px 56px}.intro{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin:0 0 28px}.eyebrow{font-size:12px;letter-spacing:2px;color:#b7b4ae}h1{font-size:30px;letter-spacing:-1px;margin:10px 0;font-weight:600}.intro p{font-size:14px;line-height:1.8;color:#b7b4ae;margin:0}.sample{font:12px/1.8 Menlo,monospace;white-space:nowrap;text-align:right;color:#aaa9a4}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:32px}article{min-width:0}.card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px}.card-head h2{font-size:17px;font-weight:500;margin:0}.tag{font-size:12px;color:#b5d0b4;border:1px solid #63745f;padding:3px 8px;border-radius:4px}.screen{aspect-ratio:1/1;width:100%;overflow:hidden;background:#000;outline:1px solid #ffffff12}.screen>svg{display:block;width:100%;height:100%}.caption{font-size:13px;line-height:1.7;color:#b7b4ae;margin:11px 0 0;min-height:44px}.actions{display:flex;gap:14px;align-items:center;margin-top:14px}.actions button{flex:1;border:1px solid #72716d;background:transparent;color:#eeeae2;min-height:44px;border-radius:5px;cursor:pointer;font-size:14px}.actions button:hover{background:#353a3d}.actions button:focus-visible,a:focus-visible{outline:2px solid #F1BE58;outline-offset:4px}.actions a{font-size:12px;white-space:nowrap}.details{border-top:1px solid #505151;margin-top:38px;padding-top:24px}.details h2{font-size:18px;margin:0 0 16px}.notes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px 32px}.notes h3{font-size:14px;font-weight:500;margin:0 0 7px}.notes p,.limitations{font-size:13px;line-height:1.85;color:#b7b4ae;margin:0}.limitations{margin-top:24px}details{margin-top:24px;font-size:13px;color:#b7b4ae}summary{cursor:pointer}.dials{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:18px}.dials label{display:grid;gap:8px}.dials input{width:100%;accent-color:#d7cdbc}output{font-variant-numeric:tabular-nums}#local-status{font-size:13px;color:#e0cf9d;line-height:1.7;margin-top:14px}@media(min-width:1104px){.screen{max-width:480px}}@media(max-width:740px){main{padding:24px 18px 36px}.intro{display:block}h1{font-size:25px}.sample{text-align:left;margin-top:12px;white-space:normal}.grid{grid-template-columns:minmax(0,1fr);gap:28px}.screen{max-width:480px;margin:auto}.notes{grid-template-columns:minmax(0,1fr)}.caption{min-height:0}.dials{grid-template-columns:minmax(0,1fr);gap:18px}}
+</style>
+</head>
+<body>
+<main>
+<header class="intro"><div><div class="eyebrow">PI METER / DESIGN STUDIES</div><h1>一块屏，四种性格。</h1><p>480 × 480 方向样机，不是最终固件。所有方案使用同一组示例数据。</p><p>选你更喜欢的布局，也可以混搭。选择只记录偏好，不会开始实现。</p></div><div class="sample">$0.79 USD · 3.16M TOKENS<br>官方 Pi 标志 · 静态显示<br><a href="overview.png">查看四图总览 PNG</a></div></header>
+<section class="grid" aria-label="四个设计方向">
+<article data-design-option="A" data-name="黑底精密仪表"><header class="card-head"><h2>A · 黑底精密仪表</h2><span class="tag">推荐</span></header><div class="screen" id="screen-a"><svg xmlns="http://www.w3.org/2000/svg" width="480" height="480" viewBox="0 0 480 480" role="img" aria-labelledby="a-title a-desc">
+  <title id="a-title">Pi Meter — Black Precision</title>
+  <desc id="a-desc">A 480 by 480 AMOLED desktop display concept. Example data for October 16: today's recorded USD equivalent is $0.79; 3.16M tokens, including input 258.8K, output 24.2K, and cache read 2.88M. 34 requests. Updated 18 seconds ago. This is a design preview, not live data.</desc>
+  <rect width="480" height="480" fill="#000000"/>
+  <g font-family="Avenir Next, sans-serif" fill="#FFFFFF" style="font-variant-numeric:tabular-nums lining-nums">
+    <svg x="32" y="22" width="36" height="36" viewBox="140 140 520 520" aria-hidden="true">
+      <path fill="#F09082" d="M165.29 165.29H517.36V400H400V282.65H165.29Z"/>
+      <path fill="#4D9ABF" d="M165.29 282.65H282.65V400H400V517.36H282.65V634.72H165.29Z"/>
+      <path fill="#F1BE58" d="M517.36 400H634.72V634.72H517.36Z"/>
+    </svg>
+    <text x="80" y="48" font-size="20" font-weight="600" letter-spacing="0.3">pi meter</text>
+    <text x="448" y="47" text-anchor="end" font-size="16" font-weight="500" letter-spacing="1.2" fill="#B5B0AA">OCT 16</text>
+    <path d="M32 76H448" fill="none" stroke="#49443F" stroke-width="1"/>
+    <text x="32" y="108" font-size="16" font-weight="500" letter-spacing="1.8" fill="#B5B0AA">TODAY</text>
+    <text x="32" y="203" font-size="112" font-weight="600" letter-spacing="-5">$0.79</text>
+    <text x="35" y="232" font-size="16" font-weight="500" letter-spacing="1.5" fill="#B5B0AA">USD · RECORDED</text>
+    <text x="32" y="291" font-size="46" font-weight="500" letter-spacing="-1.3">3.16M<tspan dx="12" font-size="20" font-weight="400" letter-spacing="0" fill="#B5B0AA">tokens</tspan></text>
+    <path d="M32 316H448" fill="none" stroke="#49443F" stroke-width="1"/>
+    <text x="32" y="345" font-size="16" font-weight="500" letter-spacing="1.1" fill="#B5B0AA">IN</text>
+    <text x="182" y="345" font-size="16" font-weight="500" letter-spacing="1.1" fill="#B5B0AA">OUT</text>
+    <text x="320" y="345" font-size="16" font-weight="500" letter-spacing="0.6" fill="#B5B0AA">CACHE READ</text>
+    <text x="32" y="382" font-size="28" font-weight="500" letter-spacing="-0.6">258.8K</text>
+    <text x="182" y="382" font-size="28" font-weight="500" letter-spacing="-0.6">24.2K</text>
+    <text x="320" y="382" font-size="28" font-weight="500" letter-spacing="-0.6">2.88M</text>
+    <path d="M32 405H448" fill="none" stroke="#49443F" stroke-width="1"/>
+    <text x="32" y="444" font-size="24" font-weight="500">34<tspan dx="9" font-size="16" font-weight="400" fill="#B5B0AA">requests</tspan></text>
+    <text x="237" y="444" font-size="16" font-weight="500" fill="#B5B0AA">UPDATED<tspan dx="10" font-size="24" fill="#FFFFFF">18s</tspan><tspan dx="7" font-size="16" font-weight="400">ago</tspan></text>
+    <circle cx="444" cy="438" r="3" fill="#F1BE58"/>
+  </g>
+</svg>
+</div><p class="caption">让费用先被看见，再看 token。纯黑、细线、留白，不像网页后台。</p><div class="actions"><button class="qmdp-pick-button" data-pick="A" type="button">选择 A · 黑底精密仪表</button><a href="a.png" download>480px PNG ↓</a></div></article>
+<article data-design-option="B" data-name="暖纸数字账单"><header class="card-head"><h2>B · 暖纸数字账单</h2></header><div class="screen" id="screen-b"><svg xmlns="http://www.w3.org/2000/svg" width="480" height="480" viewBox="0 0 480 480" role="img" aria-labelledby="b-title b-desc">
+  <title id="b-title">Pi usage — Warm Light Paper Ledger</title>
+  <desc id="b-desc">Illustrative design preview, not live data. October 16: $0.79 USD recorded, 3.16M tokens. Input 258.8K, output 24.2K, cache read 2.88M. 34 requests; updated 18s ago. Warm light paper background, dark serif typography, and receipt-like ledger rows without texture. Light comparison direction with a known AMOLED brightness and power cost relative to dark backgrounds.</desc>
+  <rect width="480" height="480" fill="#e5dfd0"/>
+
+  <svg x="32" y="32" width="34" height="34" viewBox="140 140 520 520" aria-hidden="true">
+    <path fill="#F09082" d="M165.29 165.29H517.36V400H400V282.65H165.29Z"/>
+    <path fill="#4D9ABF" d="M165.29 282.65H282.65V400H400V517.36H282.65V634.72H165.29Z"/>
+    <path fill="#F1BE58" d="M517.36 400H634.72V634.72H517.36Z"/>
+  </svg>
+  <g font-family="Georgia, serif" fill="#28251f" font-size="17">
+    <text x="80" y="55" letter-spacing="1.3">Pi / TODAY</text>
+    <text x="448" y="55" text-anchor="end" letter-spacing="1.3">OCT 16</text>
+  </g>
+  <path d="M32 84.5H448" stroke="#8C7B63" stroke-width="1"/>
+
+  <text x="240" y="185" text-anchor="middle" font-family="Georgia, serif" font-size="100" fill="#28251f" letter-spacing="-3">$0.79</text>
+  <text x="240" y="220" text-anchor="middle" font-family="Georgia, serif" font-size="16" fill="#28251f" letter-spacing="2">USD · RECORDED</text>
+  <text x="240" y="273" text-anchor="middle" font-family="Georgia, serif" font-size="36" fill="#28251f">3.16M tokens</text>
+
+  <path d="M32 294.5H448" stroke="#8C7B63" stroke-width="1"/>
+  <g font-family="Georgia, serif" font-size="23" fill="#28251f" letter-spacing="0.7">
+    <text x="32" y="327">IN</text>
+    <text x="32" y="366">OUT</text>
+    <text x="32" y="405">CACHE READ</text>
+  </g>
+  <g font-family="Georgia, serif" font-size="27" fill="#28251f" text-anchor="end" style="font-variant-numeric:tabular-nums">
+    <text x="448" y="327">258.8K</text>
+    <text x="448" y="366">24.2K</text>
+    <text x="448" y="405">2.88M</text>
+  </g>
+  <path d="M32 342.5H448 M32 381.5H448" stroke="#b8ac96" stroke-width="0.75"/>
+  <path d="M32 424.5H448" stroke="#8C7B63" stroke-width="1"/>
+
+  <g font-family="Georgia, serif">
+    <text x="32" y="449" font-size="23" fill="#28251f">34 requests</text>
+    <text x="448" y="449" text-anchor="end" font-size="16" fill="#28251f">updated 18s ago</text>
+  </g>
+</svg>
+</div><p class="caption">居中的衬线金额、纸色背景，像一张安静的账单。作为亮色对照。</p><div class="actions"><button class="qmdp-pick-button" data-pick="B" type="button">选择 B · 暖纸数字账单</button><a href="b.png" download>480px PNG ↓</a></div></article>
+<article data-design-option="C" data-name="终端双读数"><header class="card-head"><h2>C · 终端双读数</h2></header><div class="screen" id="screen-c"><svg xmlns="http://www.w3.org/2000/svg" width="480" height="480" viewBox="0 0 480 480" role="img" aria-labelledby="c-title c-desc" font-family="Menlo,monospace">
+  <title id="c-title">Pi meter — Terminal / Dual Register</title>
+  <desc id="c-desc">Design preview, not firmware. October 16: recorded cost $0.79 USD and 3.16M tokens. Input 258.8K, output 24.2K, cache read 2.88M. 34 requests; updated 18s ago.</desc>
+  <rect width="480" height="480" fill="#091014"/>
+  <g fill="#96A9B3" font-size="16" font-weight="400">
+    <text x="30" y="54" font-size="18" letter-spacing="1.2">OCT 16</text>
+    <text x="30" y="102" letter-spacing="2">COST</text>
+    <text x="30" y="222" letter-spacing="0.8">USD · RECORDED</text>
+    <text x="30" y="279" letter-spacing="2">TOKENS</text>
+  </g>
+  <svg x="414" y="30" width="36" height="36" viewBox="140 140 520 520" aria-hidden="true">
+    <path fill="#F09082" d="M165.29 165.29H517.36V400H400V282.65H165.29Z"/>
+    <path fill="#4D9ABF" d="M165.29 282.65H282.65V400H400V517.36H282.65V634.72H165.29Z"/>
+    <path fill="#F1BE58" d="M517.36 400H634.72V634.72H517.36Z"/>
+  </svg>
+  <text x="30" y="191" fill="#E1F1F5" font-size="90" font-weight="500" letter-spacing="-3">$0.79</text>
+  <path d="M438 122H449V201H438" fill="none" stroke="#78D7E8" stroke-width="2"/>
+  <path d="M30 248H450M30 360H450M30 425H450" fill="none" stroke="#293B45" stroke-width="1"/>
+  <text x="30" y="338" fill="#A5E5EF" font-size="58" font-weight="500" letter-spacing="-1">3.16M</text>
+  <g fill="#96A9B3" font-size="16" letter-spacing="0.4">
+    <text x="30" y="386">IN</text>
+    <text x="170" y="386">OUT</text>
+    <text x="310" y="386">CACHE READ</text>
+  </g>
+  <g fill="#E1F1F5" font-size="22" font-weight="500">
+    <text x="30" y="411">258.8K</text>
+    <text x="170" y="411">24.2K</text>
+    <text x="310" y="411">2.88M</text>
+  </g>
+  <g fill="#96A9B3" font-size="16">
+    <text x="30" y="447">34 requests</text>
+    <text x="450" y="447" text-anchor="end">updated 18s ago</text>
+  </g>
+</svg>
+</div><p class="caption">等宽字、冷色、双层读数。更突出 token，像开发者桌上的测量仪。</p><div class="actions"><button class="qmdp-pick-button" data-pick="C" type="button">选择 C · 终端双读数</button><a href="c.png" download>480px PNG ↓</a></div></article>
+<article data-design-option="D" data-name="Pi 品牌色"><header class="card-head"><h2>D · Pi 品牌色</h2></header><div class="screen" id="screen-d"><svg xmlns="http://www.w3.org/2000/svg" width="480" height="480" viewBox="0 0 480 480" role="img" aria-labelledby="d-title d-desc">
+  <title id="d-title">Pi Meter — Direction D: Pi Color / Asymmetric</title>
+  <desc id="d-desc">Illustrative design preview for October 16, not firmware. An asymmetric editorial composition on black with small square category indices. Recorded cost is $0.79 USD; total usage is 3.16M tokens: input 258.8K, output 24.2K, cache read 2.88M. 34 requests, updated 18 seconds ago. Coral identifies cost, blue identifies input and cache read, gold identifies output, and white identifies the total.</desc>
+  <rect width="480" height="480" fill="#0c0c0f"/>
+  <svg x="32" y="32" width="34" height="34" viewBox="140 140 520 520" aria-hidden="true">
+    <path fill="#F09082" d="M165.29 165.29H517.36V400H400V282.65H165.29Z"/>
+    <path fill="#4D9ABF" d="M165.29 282.65H282.65V400H400V517.36H282.65V634.72H165.29Z"/>
+    <path fill="#F1BE58" d="M517.36 400H634.72V634.72H517.36Z"/>
+  </svg>
+  <g font-family="'Avenir Next', Avenir, sans-serif">
+    <text x="79" y="56" fill="#f5f3ef" font-size="18" font-weight="600" letter-spacing="1.5">PI METER</text>
+    <text x="448" y="55" text-anchor="end" fill="#b7b6bd" font-family="'SFMono-Regular', Menlo, Consolas, monospace" font-size="16">OCT 16</text>
+
+    <rect x="32" y="111" width="7" height="7" fill="#F09082"/>
+    <text x="95" y="189" fill="#F09082" font-size="106" font-weight="500" letter-spacing="-5">$0.79</text>
+    <text x="102" y="220" fill="#F09082" font-family="'SFMono-Regular', Menlo, Consolas, monospace" font-size="16" letter-spacing="0.5">USD · RECORDED</text>
+
+    <rect x="32" y="318" width="7" height="7" fill="#4D9ABF"/>
+    <rect x="32" y="388" width="7" height="7" fill="#4D9ABF"/>
+    <text x="64" y="288" fill="#f5f3ef" font-size="48" font-weight="600" letter-spacing="-1.8">3.16M<tspan dx="12" fill="#b7b6bd" font-size="18" font-weight="400" letter-spacing="0">tokens</tspan></text>
+
+    <g font-family="'SFMono-Regular', Menlo, Consolas, monospace">
+      <text x="64" y="329" fill="#4D9ABF" font-size="16">IN</text>
+      <text x="64" y="362" fill="#4D9ABF" font-size="27" letter-spacing="-0.5">258.8K</text>
+      <rect x="275" y="318" width="7" height="7" fill="#F1BE58"/>
+      <text x="296" y="329" fill="#F1BE58" font-size="16">OUT</text>
+      <text x="296" y="362" fill="#F1BE58" font-size="27" letter-spacing="-0.5">24.2K</text>
+      <text x="64" y="399" fill="#4D9ABF" font-size="16">CACHE READ</text>
+      <text x="236" y="399" fill="#4D9ABF" font-size="25" letter-spacing="-0.5">2.88M</text>
+      <text x="32" y="446" fill="#b7b6bd" font-size="16">34 requests</text>
+      <text x="448" y="446" text-anchor="end" fill="#b7b6bd" font-size="16">updated 18s ago</text>
+    </g>
+  </g>
+</svg>
+</div><p class="caption">非对称编排，借 Pi 的珊瑚、蓝、金建立识别。更有个性，但更活跃。</p><div class="actions"><button class="qmdp-pick-button" data-pick="D" type="button">选择 D · Pi 品牌色</button><a href="d.png" download>480px PNG ↓</a></div></article>
+</section>
+<p id="local-status" role="status" aria-live="polite"></p>
+<section class="details"><h2>怎么选</h2><div class="notes"><div><h3>A · 推荐作为常驻屏</h3><p>无衬线、左对齐、纯黑底。信息层级最直接，亮屏面积也较小。代价是相对克制，记忆点更多依赖数字排版。</p></div><div><h3>B · 用排版代替科技感</h3><p>衬线、居中金额、横向账单明细。暖色更像桌面物件，但亮屏面积明显更大，不是 AMOLED 长亮的首选。</p></div><div><h3>C · 费用与用量都重要</h3><p>等宽、上下双读数、冰青色。更有技术仪表感，也更方便对齐位数；代价是同样空间里字形更宽。</p></div><div><h3>D · 更像 Pi 的专属设备</h3><p>品牌色、错位布局、彩色数据索引。摆在桌上更有辨识度；代价是色彩会分散一部分对金额的注意力。</p></div></div><p class="limitations">共同约束：静态优先；不做假趋势、配额环或常驻动画。USD · RECORDED 表示日志记录金额（可能包含折算），并非供应商账单。IN / OUT / CACHE READ 分别是输入、输出、缓存读取。屏幕文字先用拉丁字符，避免首版引入整套中文字库。样图采用电脑字体；实机需验证字库、屏幕亮度、圆角安全区、金额位数增长及过期状态。</p><details><summary>设计偏好参数（仅记录下一轮偏好，不改变当前样图）</summary><div class="dials"><label>视觉冒险度 <output data-qmdp-output="variance">4</output>/10<input data-qmdp-dial="variance" type="range" min="1" max="10" value="4" aria-label="视觉冒险度"></label><label>动效强度 <output data-qmdp-output="motion">1</output>/10<input data-qmdp-dial="motion" type="range" min="1" max="10" value="1" aria-label="动效强度"></label><label>信息密度 <output data-qmdp-output="density">5</output>/10<input data-qmdp-dial="density" type="range" min="1" max="10" value="5" aria-label="信息密度"></label></div></details></section>
+</main>
+<script>
+// file:// has no callback bridge: keep selection local and ask for a chat reply.
+document.querySelectorAll('[data-pick]').forEach(button=>button.addEventListener('click',()=>{
+  if (window.qiaomuDesignSelect) return;
+  document.querySelectorAll('article').forEach(card=>card.style.outline='');
+  button.closest('article').style.outline='2px solid #e0cf9d';
+  document.querySelector('#local-status').textContent='已选 '+button.dataset.pick+'。当前为本地离线预览，请在对话里告诉我你的选择或混搭想法；不会自动进入实现。';
+}));
+</script>
+</body>
+</html>

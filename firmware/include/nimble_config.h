@@ -1,0 +1,13 @@
+#pragma once
+// Load the platform defaults first; command-line defines alone are overwritten by sdkconfig.
+#include <sdkconfig.h>
+#undef CONFIG_NIMBLE_ROLE_CENTRAL
+#undef CONFIG_NIMBLE_ROLE_OBSERVER
+#undef CONFIG_BT_NIMBLE_ROLE_CENTRAL
+#undef CONFIG_BT_NIMBLE_ROLE_OBSERVER
+#undef CONFIG_BT_NIMBLE_MAX_CONNECTIONS
+#undef CONFIG_NIMBLE_MAX_CONNECTIONS
+#define CONFIG_BT_NIMBLE_ROLE_CENTRAL 0
+#define CONFIG_BT_NIMBLE_ROLE_OBSERVER 0
+#define CONFIG_BT_NIMBLE_MAX_CONNECTIONS 1
+#define CONFIG_NIMBLE_MAX_CONNECTIONS 1

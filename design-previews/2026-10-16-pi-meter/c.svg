@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="480" viewBox="0 0 480 480" role="img" aria-labelledby="title desc" font-family="Menlo,monospace">
+  <title id="title">Pi meter — Terminal / Dual Register</title>
+  <desc id="desc">Design preview, not firmware. October 16: recorded cost $0.79 USD and 3.16M tokens. Input 258.8K, output 24.2K, cache read 2.88M. 34 requests; updated 18s ago.</desc>
+  <rect width="480" height="480" fill="#091014"/>
+  <g fill="#96A9B3" font-size="16" font-weight="400">
+    <text x="30" y="54" font-size="18" letter-spacing="1.2">OCT 16</text>
+    <text x="30" y="102" letter-spacing="2">COST</text>
+    <text x="30" y="222" letter-spacing="0.8">USD · RECORDED</text>
+    <text x="30" y="279" letter-spacing="2">TOKENS</text>
+  </g>
+  <svg x="414" y="30" width="36" height="36" viewBox="140 140 520 520" aria-hidden="true">
+    <path fill="#F09082" d="M165.29 165.29H517.36V400H400V282.65H165.29Z"/>
+    <path fill="#4D9ABF" d="M165.29 282.65H282.65V400H400V517.36H282.65V634.72H165.29Z"/>
+    <path fill="#F1BE58" d="M517.36 400H634.72V634.72H517.36Z"/>
+  </svg>
+  <text x="30" y="191" fill="#E1F1F5" font-size="90" font-weight="500" letter-spacing="-3">$0.79</text>
+  <path d="M438 122H449V201H438" fill="none" stroke="#78D7E8" stroke-width="2"/>
+  <path d="M30 248H450M30 360H450M30 425H450" fill="none" stroke="#293B45" stroke-width="1"/>
+  <text x="30" y="338" fill="#A5E5EF" font-size="58" font-weight="500" letter-spacing="-1">3.16M</text>
+  <g fill="#96A9B3" font-size="16" letter-spacing="0.4">
+    <text x="30" y="386">IN</text>
+    <text x="170" y="386">OUT</text>
+    <text x="310" y="386">CACHE READ</text>
+  </g>
+  <g fill="#E1F1F5" font-size="22" font-weight="500">
+    <text x="30" y="411">258.8K</text>
+    <text x="170" y="411">24.2K</text>
+    <text x="310" y="411">2.88M</text>
+  </g>
+  <g fill="#96A9B3" font-size="16">
+    <text x="30" y="447">34 requests</text>
+    <text x="450" y="447" text-anchor="end">updated 18s ago</text>
+  </g>
+</svg>
