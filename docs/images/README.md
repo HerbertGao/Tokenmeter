@@ -7,10 +7,10 @@
 - [home.png](home.png)：今日首页，480 × 480。
 - [yesterday.png](yesterday.png)：上一日汇总，480 × 480；同布局、`HOME >`回今日，无昨日模型明细。
 - [models-1.png](models-1.png)、[models-2.png](models-2.png)：模型明细两页，各 480 × 480；同名模型跨 provider 不合并。
-- [overview.png](overview.png)：三页无缩放横向拼图，1472 × 480，深灰间隙各 16 像素。
+- [overview.png](overview.png)：四页无缩放 2×2 拼图，976 × 976，深灰间隙各16像素；上排为昨日／今日汇总，下排为今日模型明细1／2页。
 
 今日示例日期为 2026-10-17（Asia/Shanghai），采样时间12:00，日结束为次日00:00；已连接、1m ago、状态正常。今日合计$0.79、3,160,000 tokens、34 records。上一日示例为2026-10-16，$1.24、2,400,000 tokens、27 records，输入180,000、输出20,000、cache read2,200,000。两日issues/unpriced均为0，全部为合成示例。
 
-今日／昨日两张汇总图由 `python3 firmware/checks/ui.py --render-dir docs/images` 的真实LVGL回归渲染导出；截图在原生淡入完成后捕获，不用于声称实机动画帧率。汇总页金额在标题下方累计下移9px（原控件y31→40），示例中标题与金额的可见字形间隔为10px；合图同步使用更新后的首页。
+今日／昨日两张汇总图由 `python3 firmware/checks/ui.py --render-dir docs/images` 的真实LVGL回归渲染导出；截图在原生淡入完成后捕获，不用于声称实机动画帧率。汇总页金额在标题下方累计下移9px（原控件y31→40），示例中标题与金额的可见字形间隔为10px；合图统一使用这四张原生页面，不单独突出某一日。
 
 未读取设备、USB、BLE 或私人会话数据。PNG 不含文本元数据或本机路径；离线渲染不验证屏幕面板、触摸硬件或实机显示效果。

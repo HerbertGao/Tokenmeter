@@ -1,179 +1,126 @@
 # Tokenmeter
 
-把 Waveshare **ESP32-S3-Touch-AMOLED-2.16（480×480）**用作 Pi 今日与上一日 token／日志费用桌面仪表。
+用 Waveshare **ESP32-S3-Touch-AMOLED-2.16（480×480）**展示 Pi 的今日／上一日 token 用量和日志费用，通过本地 daemon 经 BLE 更新。
 
-采用左对齐布局与品牌配色：首页费用与总 token，明细按 `provider/model` 分组、每页两条、可按钮或上下滑动翻页。不 fork 旧桌面 App，不需要 Claude 订阅、用量 API、数据库或 Wi-Fi。
+支持两日汇总、今日 `provider/model` 明细、四向自动旋转与触摸翻页。不需要 Claude 订阅、用量 API、Wi-Fi、数据库或桌面 App。
 
 ## 界面预览
 
-![Tokenmeter 首页和两页模型明细示例](docs/images/overview.png)
+![Tokenmeter 界面预览：上排昨日与今日汇总，下排今日模型明细](docs/images/overview.png)
 
-以上为**当前固件真实 LVGL 界面代码的离线示例渲染，非实机截图或照片**。统计为合成示例，不代表真实用量、账单或模型定价；字库、页面布局与颜色均直接来自固件。
+四个页面统一展示：上排为昨日、今日汇总，下排为今日模型明细的两页。图片由真实 LVGL 界面代码配合合成数据离线渲染，**不是实机照片，也不代表真实用量、账单或模型定价**。原尺寸图片和渲染说明见 [docs/images](docs/images/README.md)。
 
-原尺寸单页：[今日首页](docs/images/home.png) · [上一日汇总](docs/images/yesterday.png) · [今日明细 1](docs/images/models-1.png) · [今日明细 2](docs/images/models-2.png)。渲染说明见 [docs/images/README.md](docs/images/README.md)。
+## 快速开始（macOS）
 
-上一日沿用首页布局，只看这一天的总计，不提供更早日期或昨日模型列表：
+需要 Git 和 Python 3.10+，推荐 Python 3.14。目前一键脚本和实机连接均在 macOS 验证。
 
-![上一日汇总示例，同样为离线合成数据渲染](docs/images/yesterday.png)
-
-## macOS 一键脚本
-
-先安装 Python 3.10+（推荐 3.14），然后在终端执行：
+### 1. 获取代码
 
 ```sh
 git clone https://github.com/HerbertGao/Tokenmeter.git
 cd Tokenmeter
-./start-daemon.sh
 ```
 
-`start-daemon.sh` 首次创建项目 `.venv`、安装固定版本的 BLE 依赖，然后前台运行本地 daemon；后续复用环境并检查所需依赖。参数原样传给 daemon，按 `Ctrl+C` 停止：
+两个脚本会在项目 `.venv` 中准备所需 Python 包，并复用已有环境。首次运行需要联网；固件构建还会使用 PlatformIO 用户缓存。脚本不会安装系统 Python、使用 sudo、安装开机服务或修改系统蓝牙配置；发现损坏的 `.venv` 会报错，不自动删除重建。
 
-```sh
-./start-daemon.sh --pi-dir /path/to/pi-agent
-./start-daemon.sh --once       # 只看统计，不装依赖、不连接蓝牙
-./start-daemon.sh --help
-```
+### 2. 按需刷入固件
 
-**换电脑连接已经刷好的设备，不需要重新刷固件。** 先停止旧电脑的 daemon，新电脑开启蓝牙并允许终端/Python 的蓝牙权限，再运行启动脚本；不需要手动配对。
-
-首次刷机或更新固件时，插入支持数据传输的 USB 线，在项目根目录运行：
+**已有 Tokenmeter 固件时，换电脑连接不需要重刷，可直接跳到下一步。** 首次使用或需要更新固件时，确认板型是 **ESP32-S3-Touch-AMOLED-2.16，16MB Flash / 8MB PSRAM**，使用支持数据传输的 USB 线连接：
 
 ```sh
 ./flash.sh
-# 也可以明确指定 pio device list 中的串口
+# 也可指定设备列表中的准确串口
 ./flash.sh /dev/cu.usbmodemXXXX
 ```
 
-`flash.sh` 自动在项目 `.venv` 安装 PlatformIO 6.2.0，再选串口。只有一个 ESP32 原生 USB 候选时显示该端口，多台时要求选择，不会默认取第一台；也可显式指定列出的串口。USB标识不等于板型保证，确认实物是 **ESP32-S3-Touch-AMOLED-2.16（16MB Flash / 8MB PSRAM）** 后输入 `FLASH`，才从当前源码构建并上传。刷机会覆盖现有固件；脚本不备份、不整片擦除、不提供跳过确认的参数。
+脚本在项目虚拟环境安装 PlatformIO 6.2.0。单个 ESP32 原生 USB 候选会显示端口，多台候选必须选择，输入 `FLASH` 后才构建并上传。**USB 标识不能证明板型；刷机会覆盖现有固件，脚本不备份、不整片擦除，也不提供跳过确认的参数。** 请先核对实物、端口和备份需要，不要向其他板型上传。
 
-首次准备需要联网下载 PyPI 包和 PlatformIO 构建依赖（使用项目 `.venv` 及 PlatformIO 用户缓存）。脚本不安装系统 Python、不用 sudo、不改系统蓝牙或权限、不装开机服务；损坏的现有 `.venv` 会报错而不是自动删除重建。若文件无执行权限，可用 `bash ./start-daemon.sh` 或 `bash ./flash.sh` 运行。当前仅提供 macOS 入口。
+### 3. 启动本地 daemon
 
-下面保留手动命令，便于排查环境或不使用脚本时操作。
-
-## 先看本机统计，不需要设备
-
-在项目根目录运行：
+新电脑开启蓝牙，然后运行：
 
 ```sh
-python3 -m daemon.tokenmeter --once
+./start-daemon.sh
 ```
 
-`--once` 仅需 Python 标准库，输出今日统计及 `yesterday` 上一日摘要 JSON，不加载 Bluetooth。默认读 `PI_AGENT_DIR/sessions`；未设置时读 `~/.pi/agent/sessions`。
+脚本自动安装 BLE 依赖，前台运行并默认每 60 秒推送，按 `Ctrl+C` 停止。macOS 首次询问时允许终端／Python 使用蓝牙；通常不需要在系统设置中手动配对。
 
-自定义或合并多个 Pi agent 目录：
+设备只允许一个连接，**先停止旧电脑或旧终端的 daemon**，避免多个进程争抢。首次启动会自动寻找 Tokenmeter；多台设备可用 `--address` 指定，macOS 外设 UUID 不应直接从另一台 Mac 照搬。
+
+默认从 `PI_AGENT_DIR/sessions` 读取；未设置时使用 `~/.pi/agent/sessions`。可先只检查统计，或指定其他目录：
 
 ```sh
-python3 -m daemon.tokenmeter --once --pi-dir /path/to/pi-agent
-python3 -m daemon.tokenmeter --once --pi-dir /path/to/agent-one --pi-dir /path/to/agent-two
+./start-daemon.sh --once
+./start-daemon.sh --pi-dir /path/to/pi-agent
+./start-daemon.sh --pi-dir /path/to/agent-one --pi-dir /path/to/agent-two
+./start-daemon.sh --help
 ```
 
-`--pi-dir` 指包含 `sessions/` 的 agent 目录，不是会话文件或 `auth.json`。现有空目录是有效零用量；缺失目录、坏记录与缺价均显式标记，不能当成完整零账单。
+`--once` 只用 Python 标准库，不安装 BLE 依赖、不连接设备。`--pi-dir` 指**包含 `sessions/` 的 agent 根目录**，不是会话文件或 `auth.json`；多目录会按原有去重规则合并。设备显示的是运行 daemon 的电脑所能读取的数据，不自动同步其他电脑的日志。
 
-## 手动运行 BLE daemon
+若脚本没有执行权限，可用 `bash ./flash.sh` 或 `bash ./start-daemon.sh`。需要手动安装时，使用项目虚拟环境安装 `daemon/requirements.txt`，再运行 `.venv/bin/python -m daemon.tokenmeter`；手动构建见[固件说明](firmware/README.md)。
 
-建议 Python 3.10+；本机验证使用 Python 3.14 虚拟环境，已安装 Bleak 2.1.1。
+## 更新与换机
+
+在旧 daemon 终端按 `Ctrl+C` 停止，再更新并重新启动：
 
 ```sh
-python3 -m venv .venv
-.venv/bin/python -m pip install -r daemon/requirements.txt
-.venv/bin/python -m daemon.tokenmeter
+git pull
+./start-daemon.sh
 ```
 
-首次实际扫描时，macOS 可能要求终端/Python 的 Bluetooth 权限。默认约60秒刷新，掉线重连；`--interval` 可设1–120秒。多台 Tokenmeter 同时存在时，使用 `--address` 指定设备地址；macOS 通常使用外设 UUID。
+已运行的 Python 进程不会自动加载新代码。涉及固件功能的更新还需运行 `./flash.sh`，并让 daemon 与固件配套升级；仅换电脑无需重刷。旧 daemon 不发送上一日摘要时，新固件会显示 `NO DATA`，不会伪造为零；更新后重启 daemon，再等待首次推送。
 
-只连接新 Tokenmeter service，不会连接仍在运行旧 Clawdmeter 固件的设备。当前未自动启动 daemon，没有安装 LaunchAgent，也没有停止或修改旧服务。
+## 屏幕操作
 
-## 固件
+| 当前页面 | 操作 | 结果 |
+| --- | --- | --- |
+| 今日汇总 | 右滑 | 上一日汇总 |
+| 上一日汇总 | 左滑或点 `HOME >` | 今日汇总 |
+| 今日汇总 | 左滑或点 `MODELS >` | 今日模型明细 |
+| 模型明细 | 右滑或点 `< HOME` | 今日汇总 |
+| 模型明细 | 上／下滑或点 `NEXT`／`PREV` | 下一／上一页；第一页下滑不离开明细 |
+| 任意页面 | 按 GPIO18 自定义实体 HOME 键 | 今日汇总 |
 
-仅支持上述 ESP32-S3 2.16 板型：CO5300 QSPI、CST9220、AXP2101、PSRAM。保留必要显示/触摸/电源初始化；QMI8658 加速度计用于四向自动方向，不带 HID、声音或旧 splash。
+汇总页上下滑不翻页，上一日页继续右滑没有更早日期，也不提供昨日模型明细。实体 HOME 不是 BOOT、PWR 或 RESET，不做双击／长按模式。
 
-使用 PlatformIO：
+手势和按钮都相对当前画面方向。沿有效方向达到 50px 即响应，不等松手；同一笔触摸最多切一次，滑动不会误点按钮，也可从灰色按钮区域起手。
 
-```sh
-pio run -d firmware
-```
+方向稳定 400ms 后自动切换四个正交朝向；平放、接近 45°、明显晃动或触摸期间保持原方向。用户切页采用约 120ms 内容淡入，分钟数据更新不播放动画。
 
-首次编译会下载平台与库。字库来自 DejaVu Sans Mono，4bpp、固定像素字号；设备显示动态文本，不通过 BLE 传金额截图。具体字体来源、许可和重生成命令见 `firmware/fonts/`。
+## 数据、隐私与边界
 
-已在 ESP32-S3、8MB PSRAM、16MB Flash 的目标板验证上传和 Hash 校验。先用 `pio device list` 确认设备，并将下面的示例端口替换成自己的串口：
+- **按本地自然日统计**：仅今日与上一日，不是滚动 24 小时，也没有多日历史选择。两日独立汇总，只有今日提供模型明细；同名模型跨 provider 不合并。
+- **按日志记费用**：USD 是日志记录或折算值，不是供应商最终账单；缺价不按免费处理，也不从 token 猜价格。空日志目录可表示零用量，源缺失、坏记录和缺价会明确标记。
+- **只保留用量元数据**：JSONL 容器在本机解析，仅缓存、输出和发送允许的 usage 字段；不保留／发送正文，不读取认证文件。缓存只在内存中保留两日元数据，不建立数据库或持久索引。
+- **保持更新时间可见**：常规刷新每 60 秒；新数据、连接变化和失效状态立即更新。120 秒没有有效快照或跨本地午夜时标记 `STALE`／`OLD DAY`，保留源日期而不把旧数据称为今日。重启后等待 daemon 重发，不在设备上持久保存历史。
+- **BLE 仅适合可信近场**：当前未认证、未加密，附近客户端可能注入数据，不应作为可信计费终端。
+- **有明确容量和字库限制**：整包上限 64KiB、今日 256 个分组、每个身份 192 UTF-8 字节；超限不静默截断。字库主要覆盖 ASCII 和常用标点，非 ASCII 身份在屏幕上以 `?` 替代，原始身份仍保留。
 
-```sh
-pio run -d firmware -t upload --upload-port /dev/cu.usbmodemXXXX
-```
+完整规则见[用量口径](docs/usage.md)、[BLE 协议与状态](docs/protocol.md)。
 
-刷机会覆盖现有固件，请先确认板型、端口及是否需要备份。不要把其他板型当作兼容设备直接刷入。
+## 开发与检查
 
-## 方向与操作
-
-保留现有 A+D 页面坐标、字号及按钮尺寸，没有新增大按钮或修改设计预览。
-
-- 今日首页右滑进入左边的上一日汇总页；上一日页左滑回今日，继续右滑没有更早日期。昨日底部 `HOME >` 按钮也回今日，不提供昨日模型明细。
-- 今日首页左滑进入今日模型明细，明细右滑回今日。
-- 明细上滑下一页、下滑上一页；第一页下滑仍留在明细。今日与上一日汇总页上下滑不翻页。
-- GPIO18 自定义实体键消抖30ms后始终回今日首页，按住不连发；不是 BOOT、PWR 或 RESET，也不做双击/长按模式。
-- QMI8658 加速度计约100ms采样，方向稳定400ms才切换四个正交方向。平放、接近45°边界或明显晃动时保持原方向；触摸期间暂停判向。
-- 使用实机校准后的CST原生坐标，不再额外交换XY或镜像X；LVGL统一做显示旋转和触摸逆变换，按钮与滑动方向都相对当前画面。旋转不重置当前页和数据，仅多用38,400 bytes PSRAM条带缓冲。
-
-用户实际切换日视图或明细页时，内容区用 LVGL 原生约120ms淡入，标题栏固定；快速切页会取消并复位前一个淡入。边界无效滑动、每分钟数据更新及连接/STALE变化不会重新播放动画，不增加截图缓冲或动画框架。
-
-屏内原按钮仍可点，也可从普通/灰色按钮区域起手滑动。沿有效方向达到50px即切页，不必松手；同一次按住只导航一次。滑动后不再触发按钮，快速松手也复核最终位置，防止拖入HOME等按钮误点。未变化的文字、字体和页面可见性不重复设置，避免无变化重绘整块页面。
-
-屏幕常规定时刷新为每60秒，最近更新时间按整数分钟显示（`0m ago`、`1m ago`，满小时后显示小时）。新快照、连接变化和120秒STALE/跨日状态变化仍立即刷新；滑动、按钮及方向检测节奏不变。daemon默认本就每60秒推送，无需改参数。
-
-## 用量与协议
-
-统计主机本地的今日与上一日自然日，不是滚动24小时。单次扫描仅在内存保留这两日的允许元数据，独立汇总；今日按日志中明确的 provider 与 model/responseModel 配对展示明细，昨日只发送总计。复制进 fork 的稳定 ID 记录只计一次；工具、摘要和独立 usage 事件均处理，缺少归属进入 unknown。输入、输出、缓存读取与写入按 Pi 原生口径求和，不重复叠加 reasoning。Qoder 兼容 usd_equivalent。
-
-要查看上一日，需要使用更新后的 daemon 和固件。**更新代码后，必须先在旧终端按 `Ctrl+C` 停止已经运行的 daemon，再重新运行 `./start-daemon.sh`；旧 Python 进程不会自动加载新代码。** 若只刷固件而旧进程仍发送旧快照，昨日页会显示 NO DATA，重启 daemon 后再等待首次推送。BLE v1 只增加可选 `yesterday` 摘要；新固件接旧 daemon 时昨日页显示 NO DATA，不伪造零，旧固件可继续读取今日字段。重启后由 daemon 重发，不在设备上持久保存历史；午夜收到新快照时，昨日自动变成刚结束的本地自然日。
-
-金额以日志 USD 为准，不是供应商最终账单。缺价显示未知或已知小计，不从 token 猜费用。设备在120秒未更新或跨本地午夜时自行标 stale，不把旧数据改称今日数据。
-
-- [完整用量口径与已知边界](docs/usage.md)
-- [BLE v1、内存上限与屏幕状态](docs/protocol.md)
-
-JSONL 容器在本机进程内解析，但仅缓存/输出/发送允许的用量字段；不保留或发送正文，不读取认证文件。当前 BLE 未认证、未加密，附近客户端可能注入数据，仅适合可信近距环境；这不是可信计费终端。
-
-设备整包（含昨日摘要）上限64KiB、今日256个分组、每个身份192 UTF-8字节。昨日总计超数值上限只使昨日 unavailable；今日超限回退时尽量保留合法昨日摘要，不静默丢弃今日条目。原始身份保留；初版字体只覆盖 ASCII 与常用标点，其他文字有显示限制。
-
-## 检查
-
-主机测试不访问真实日志、Bluetooth 或硬件：
+Python 与脚本测试不读取真实日志，也不访问蓝牙或硬件：
 
 ```sh
 python3 -m unittest discover -s daemon/tests -v
 python3 -m unittest discover -s scripts/tests -v
 ```
 
-脚本测试通过临时目录和替身覆盖首次venv准备、参数/空格路径、串口选择、取消和上传失败；不会实际联网安装、刷机或连接蓝牙。
-
-包含 fork 去重、跨 provider 同名模型、失败用量、Qoder、工具/摘要/独立 usage、缺价、DST/跨日、重写缓存、协议边界和 MTU/ACK。手动只读检查本机日志使用 `--once`。
-
-已完成本机冻结元数据对账：独立 Node 去重和 Qoder 归一化后，调用已安装 Pi 的原生 `getUsageCostBreakdown`，与 Python 的费用、token、记录数一致。临时元数据随检查删除。未安装 ccusage，未宣称已通过 ccusage 全账本核账。
-
-固件已在本机交叉编译通过，镜像位于 `firmware/.pio/build/waveshare_amoled_216/firmware.bin`（约1.02MB）；分钟刷新版静态 RAM 为36,232 bytes；分钟刷新版实机初始化空闲内部 RAM 为169,040 bytes、PSRAM为7,906,804 bytes，满负载峰值和长时间运行余量尚未测量。已转换六档 LVGL 字库，并校正为确认样图的品牌色和完整 Pi 小标。
-
-首次构建获取依赖后，可运行固件的 ASan/UBSan 主机自检；可选参数是 `--once` 的 JSON 输出文件：
+获取 PlatformIO 依赖后，可运行固件主机检查；原生 LVGL 检查还需要系统 C/C++ 编译器：
 
 ```sh
 sh firmware/checks/run.sh
 python3 firmware/checks/minute.py
 python3 firmware/checks/rotation.py
 python3 firmware/checks/ui.py
-sh firmware/checks/run.sh /tmp/tokenmeter-live.json
 ```
 
-主机自检和 Python→固件交叉解析已覆盖真实快照、空日、不可用、缺价、部分价格、部分源、192字节UTF-8身份、256分组和金额/计数上限。它们不证明真实触摸、显示、电源时序或 BLE 并发正确。独立 daemon 核查未发现阻塞项；配置 Pyright CLI 为0错误。常驻 LSP 的旧解释器/工作区没有刷新，相关导入提示已用正确环境的类型检查及运行测试核实为误报，没有通过源码 ignore 掩盖问题。
-
-## 实机验证与限制
-
-已在目标板验证启动、PSRAM、显示/PMU/触摸初始化、四向方向、按钮定位和最新的左滑进入/右滑返回规则。真实 BLE 使用 MTU185，完整快照收到通知和读取 ACK 均为 `ok`；重启后身份稳定并可再次连接推送。主机回归和独立 review 未发现阻塞项，但不等于长期可靠性认证。
-
-固件使用芯片地址派生的稳定 static-random BLE 身份，与旧 Clawdmeter 的 factory/public 身份分开，避免复用旧 HID 的服务缓存。身份只在 RAM 中设置，不新增 NVS/eFuse 配置写入。满负载并发、峰值/长期内存、I²C故障注入及 CPU/功耗降幅尚未测量。
-
-没有常驻更新或开机自启。要持续更新，在项目根目录手动运行 `.venv/bin/python -m daemon.tokenmeter`；停止推送120秒后显示 STALE 属正常行为。
+覆盖内容包括两日隔离、DST／跨日、去重、缺价、协议边界、输入仲裁、旋转、分钟调度和原生 LVGL 页面／动画。目标板已验证启动、显示／触摸、方向、页面切换及真实 BLE 快照提交，但这些检查不构成长期可靠性认证；满负载并发、峰值／长期内存、I²C 故障注入和功耗尚未完整测量。更多构建、内存及字体细节见[固件说明](firmware/README.md)。
 
 ## 参考与许可
 
-板级引脚、硬件 API 与初始化顺序参考 [Clawdmeter](https://github.com/HermannBjorgvin/Clawdmeter) 的同款设备支持；没有引入旧桌面 App、HAL 或其他板型。字体及生成字库的第三方许可见 [firmware/fonts/LICENSE-DejaVu.txt](firmware/fonts/LICENSE-DejaVu.txt)，PlatformIO 依赖由各自上游提供。
+板级引脚、硬件 API 和初始化顺序参考 [Clawdmeter](https://github.com/HermannBjorgvin/Clawdmeter) 的同款设备支持，没有引入旧桌面 App、HAL 或其他板型。字体许可见 [LICENSE-DejaVu.txt](firmware/fonts/LICENSE-DejaVu.txt)，PlatformIO 依赖遵循各自上游许可。
 
 本仓库暂未声明项目整体开源许可证。公开源码不改变第三方组件的许可，也不代表对参考工程的源码另行授予再分发许可。
