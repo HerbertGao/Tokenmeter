@@ -12,6 +12,40 @@
 
 原尺寸单页：[首页](docs/images/home.png) · [明细 1](docs/images/models-1.png) · [明细 2](docs/images/models-2.png)。渲染说明见 [docs/images/README.md](docs/images/README.md)。
 
+## macOS 一键脚本
+
+先安装 Python 3.10+（推荐 3.14），然后在终端执行：
+
+```sh
+git clone https://github.com/HerbertGao/Tokenmeter.git
+cd Tokenmeter
+./start-daemon.sh
+```
+
+`start-daemon.sh` 首次创建项目 `.venv`、安装固定版本的 BLE 依赖，然后前台运行本地 daemon；后续复用环境并检查所需依赖。参数原样传给 daemon，按 `Ctrl+C` 停止：
+
+```sh
+./start-daemon.sh --pi-dir /path/to/pi-agent
+./start-daemon.sh --once       # 只看统计，不装依赖、不连接蓝牙
+./start-daemon.sh --help
+```
+
+**换电脑连接已经刷好的设备，不需要重新刷固件。** 先停止旧电脑的 daemon，新电脑开启蓝牙并允许终端/Python 的蓝牙权限，再运行启动脚本；不需要手动配对。
+
+首次刷机或更新固件时，插入支持数据传输的 USB 线，在项目根目录运行：
+
+```sh
+./flash.sh
+# 也可以明确指定 pio device list 中的串口
+./flash.sh /dev/cu.usbmodemXXXX
+```
+
+`flash.sh` 自动在项目 `.venv` 安装 PlatformIO 6.2.0，再选串口。只有一个 ESP32 原生 USB 候选时显示该端口，多台时要求选择，不会默认取第一台；也可显式指定列出的串口。USB标识不等于板型保证，确认实物是 **ESP32-S3-Touch-AMOLED-2.16（16MB Flash / 8MB PSRAM）** 后输入 `FLASH`，才从当前源码构建并上传。刷机会覆盖现有固件；脚本不备份、不整片擦除、不提供跳过确认的参数。
+
+首次准备需要联网下载 PyPI 包和 PlatformIO 构建依赖（使用项目 `.venv` 及 PlatformIO 用户缓存）。脚本不安装系统 Python、不用 sudo、不改系统蓝牙或权限、不装开机服务；损坏的现有 `.venv` 会报错而不是自动删除重建。若文件无执行权限，可用 `bash ./start-daemon.sh` 或 `bash ./flash.sh` 运行。当前仅提供 macOS 入口。
+
+下面保留手动命令，便于排查环境或不使用脚本时操作。
+
 ## 先看本机统计，不需要设备
 
 在项目根目录运行：
@@ -98,7 +132,10 @@ JSONL 容器在本机进程内解析，但仅缓存/输出/发送允许的用量
 
 ```sh
 python3 -m unittest discover -s daemon/tests -v
+python3 -m unittest discover -s scripts/tests -v
 ```
+
+脚本测试通过临时目录和替身覆盖首次venv准备、参数/空格路径、串口选择、取消和上传失败；不会实际联网安装、刷机或连接蓝牙。
 
 包含 fork 去重、跨 provider 同名模型、失败用量、Qoder、工具/摘要/独立 usage、缺价、DST/跨日、重写缓存、协议边界和 MTU/ACK。手动只读检查本机日志使用 `--once`。
 

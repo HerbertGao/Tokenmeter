@@ -4,6 +4,10 @@
 
 共享契约：`../docs/protocol.md`；视觉依据：`../design-previews/2026-10-16-pi-meter-mixed/{home,models-1,models-2}.svg/.png` 与 README，按用户后续确认的 A 布局 + D 品牌色实现动态 LVGL 标签，不传截图。
 
+## macOS 快捷刷机
+
+从项目根目录运行 `./flash.sh`（在本目录则运行 `../flash.sh`），可选参数为准确串口。脚本在项目 `.venv` 安装 PlatformIO6.2.0，显示串口并要求输入 `FLASH` 后才构建/上传；多台候选必须选择，不自动取第一台。USB标识不能证明板型，仍需人工核实是本文唯一支持的设备。它不备份、不整片擦除、不安装系统服务；换电脑连接已刷好的板子无需重刷，只运行 `start-daemon.sh`。
+
 ## 手动构建 / host 验证
 
 在本目录执行（不上传）：
