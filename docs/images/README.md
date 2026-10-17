@@ -11,6 +11,6 @@
 
 今日示例日期为 2026-10-17（Asia/Shanghai），采样时间12:00，日结束为次日00:00；已连接、1m ago、状态正常。今日合计$0.79、3,160,000 tokens、34 records。上一日示例为2026-10-16，$1.24、2,400,000 tokens、27 records，输入180,000、输出20,000、cache read2,200,000。两日issues/unpriced均为0，全部为合成示例。
 
-昨日图由 `python3 firmware/checks/ui.py --render-dir docs/images` 的真实LVGL回归渲染导出；截图在原生淡入完成后捕获，不用于声称实机动画帧率。
+今日／昨日两张汇总图由 `python3 firmware/checks/ui.py --render-dir docs/images` 的真实LVGL回归渲染导出；截图在原生淡入完成后捕获，不用于声称实机动画帧率。汇总页金额在标题下方下移6px（原控件y31→37），合图同步使用更新后的首页。
 
 未读取设备、USB、BLE 或私人会话数据。PNG 不含文本元数据或本机路径；离线渲染不验证屏幕面板、触摸硬件或实机显示效果。

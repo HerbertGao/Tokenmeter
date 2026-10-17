@@ -152,6 +152,7 @@ int main(int argc, char** argv) {
     textIs(dateLabel,"2026-10-17"); textIs(period,"TODAY"); textIs(amount,"$0.79");
     textIs(tokens,"3.16M"); textIs(records,"34 records");
     textIs(lv_obj_get_child(modelsButton,0),"MODELS >");
+    if (argc==3) capture(display,(std::string(argv[2])+"/home.rgb565").c_str());
 
     stroke(100,0); state(meter::View::Yesterday); fades(home);
     textIs(dateLabel,"2026-10-16"); textIs(period,"YESTERDAY"); textIs(amount,"$1.24");
@@ -160,7 +161,7 @@ int main(int argc, char** argv) {
     textIs(lv_obj_get_child(modelsButton,0),"HOME >");
     assert(!lv_obj_has_state(modelsButton,LV_STATE_DISABLED));
     settled();
-    if (argc==3) capture(display,argv[2]);
+    if (argc==3) capture(display,(std::string(argv[2])+"/yesterday.rgb565").c_str());
     stroke(100,0); state(meter::View::Yesterday); fades();
     stroke(0,100); state(meter::View::Yesterday); fades();
     stroke(0,-100); state(meter::View::Yesterday); fades();

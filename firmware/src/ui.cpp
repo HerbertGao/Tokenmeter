@@ -127,7 +127,7 @@ void uiBegin() {
     home=box(root,0,81,480,399,0); details=box(root,0,81,480,399,0);
     // Coordinates below are relative to y=81, matching the approved previews.
     period=label(home,31,17,418,&font_16,Coral,"NO DATA YET");
-    amount=label(home,26,31,422,&font_96,Coral,"--");
+    amount=label(home,26,37,422,&font_96,Coral,"--");
     currency=label(home,32,149,306,&font_16,Gray,"USD · WAITING");
     age=label(home,340,149,108,&font_16,Gray,"--",true);
     tokens=label(home,29,184,300,&font_48,White,"--");

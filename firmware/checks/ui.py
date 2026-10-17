@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Native LVGL regression (no hardware). After the first `pio run` downloads libs:
 python3 firmware/checks/ui.py [--render-dir docs/images]
-Only --render-dir writes a project artifact: yesterday.png, an offline synthetic frame.
+Only --render-dir writes project artifacts: home.png/yesterday.png, offline synthetic frames.
 """
 import argparse
 from concurrent.futures import ThreadPoolExecutor
@@ -69,7 +69,7 @@ def png565(data):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--render-dir', type=Path, help='write only yesterday.png (offline, not a device photo)')
+    parser.add_argument('--render-dir', type=Path, help='write home.png and yesterday.png (offline, not device photos)')
     args = parser.parse_args()
     sources = sorted((LVGL / 'src').rglob('*.c'))
     fonts = [FW / 'src/fonts' / f'font_{size}.c' for size in (16, 20, 24, 32, 48, 96)]
@@ -100,14 +100,15 @@ def main():
              FW / 'checks/ui.cpp', FW / 'src/core.cpp', archive, '-o', binary], build)
         command = [binary, sample]
         if args.render_dir:
-            command.append(build / 'yesterday.rgb565')
+            command.append(build)
         print(run(command, build), end='', flush=True)
         if args.render_dir:
-            encoded = png565((build / 'yesterday.rgb565').read_bytes())
             args.render_dir.mkdir(parents=True, exist_ok=True)
-            output = args.render_dir / 'yesterday.png'
-            output.write_bytes(encoded)
-            print(f'{output}: 480x480 synthetic offline LVGL render; no text metadata')
+            for name in ('home', 'yesterday'):
+                encoded = png565((build / f'{name}.rgb565').read_bytes())
+                output = args.render_dir / f'{name}.png'
+                output.write_bytes(encoded)
+                print(f'{output}: 480x480 synthetic offline LVGL render; no text metadata')
 
 
 if __name__ == '__main__':
