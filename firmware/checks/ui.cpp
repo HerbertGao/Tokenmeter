@@ -180,6 +180,12 @@ int main(int argc, char** argv) {
     tap(388,450); state(meter::View::Details,1); fades(details);
     textIs(pageCount,"1/2"); textIs(models[0],"gpt-5.4"); textIs(costs[0],"$0.35");
     settled();
+    meter::Snapshot longModel=data;
+    strcpy(longModel.rows[0].model,"deepseek-v4.1-flash");
+    uiUpdate(&longModel,60,true); textIs(models[0],"deepseek-v4.1-flash");
+    assert(lv_obj_get_style_text_font(models[0],LV_PART_MAIN)==&font_24);
+    assert(lv_text_get_width("deepseek-v4.1-flash",19,&font_24,0)<=lv_obj_get_width(models[0]));
+    uiUpdate(&data,60,true);
     stroke(0,100); state(meter::View::Details,1); fades();
     tap(224,432); state(meter::View::Details,1); fades(); // Disabled PREV.
     stroke(0,-100); state(meter::View::Details,2); fades(details); settled();

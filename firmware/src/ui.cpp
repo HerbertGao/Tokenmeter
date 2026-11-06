@@ -112,6 +112,20 @@ static void fittedMoney(lv_obj_t* l, meter::Cost cost, int width, bool large) {
     }
     setFont(l, selected); setText(l, text);
 }
+static void fittedIdentity(lv_obj_t* l, const char* value, int width) {
+    char text[meter::IdentityLimit+1];
+    meter::identity(value,meter::IdentityLimit,text,sizeof text);
+    const lv_font_t* selected=&font_16;
+    for (auto* font : {&font_24,&font_20,&font_16}) {
+        selected=font;
+        if (lv_text_get_width(text,strlen(text),font,0)<=width) break;
+    }
+    if (lv_text_get_width(text,strlen(text),selected,0)>width) {
+        size_t columns=width/lv_text_get_width("0",1,selected,0);
+        meter::identity(value,columns,text,sizeof text);
+    }
+    setFont(l,selected); setText(l,text);
+}
 void uiBegin() {
     auto* root = lv_screen_active();
     lv_obj_remove_style_all(root);
@@ -227,8 +241,13 @@ static void refresh() {
         const auto& row=data->rows[index];
         meter::identity(row.provider,20,value,sizeof value); snprintf(text,sizeof text,"%s/",value);
         setText(providers[i],text);
-        meter::identity(row.model,14,value,sizeof value); setText(models[i],value);
         fittedMoney(costs[i],row.cost,198,false);
+        const char* cost=lv_label_get_text(costs[i]);
+        auto* costFont=lv_obj_get_style_text_font(costs[i],LV_PART_MAIN);
+        int costWidth=lv_text_get_width(cost,strlen(cost),costFont,0);
+        int modelWidth=std::max<int32_t>(213,lv_obj_get_x(costs[i])+lv_obj_get_width(costs[i])-costWidth-lv_obj_get_x(models[i])-6);
+        lv_obj_set_width(models[i],modelWidth);
+        fittedIdentity(models[i],row.model,modelWidth);
         meter::compact(row.tokens,value,sizeof value); snprintf(text,sizeof text,"%s tokens",value);
         setText(rowTokens[i],text);
         meter::compact(row.records,value,sizeof value);
